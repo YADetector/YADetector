@@ -1,0 +1,9 @@
+use_frameworks!
+
+platform :ios, '10.0'
+
+target 'YADetector_Example' do
+  pod 'YADetector', :path => '../'
+  pod 'TTMLKit', :git => 'https://github.com/YADetector/TTMLKit.git'
+  pod 'YADetectorFF', :git => 'https://github.com/YADetector/YADetectorFF.git'
+end

@@ -10,7 +10,7 @@ Yet another Face Detector。</br>
 该人脸检测结果是基于通用的106点的人脸关键点，效果类似"商汤"的检测结果。</br>
 当前系统有 YADetectorTT 和 YADetectorFF 两个实现，你也可以根据 YADetector.h 实现自己的插件，接入本项目。至于不同的关键点个数和坐标，
 可以通过简单的数学运算得出本项目一致的效果。</br>
-
+YADetectorTT 和 YADetectorFF 两个插件，YADetectorTT 性能更好些，YADetectorFF 获取关键点更稳定些。移动平台建议使用 YADetectorTT。</br>
 ## 安装
 
 使用 CocoaPods 集成，参考项目目录中 Example/Podfile 文件。

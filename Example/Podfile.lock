@@ -1,0 +1,34 @@
+PODS:
+  - TTMLKit (0.1.0)
+  - YADetector (0.1.0)
+  - YADetectorFF (0.1.0)
+
+DEPENDENCIES:
+  - TTMLKit (from `https://github.com/YADetector/TTMLKit.git`)
+  - YADetector (from `../`)
+  - YADetectorFF (from `https://github.com/YADetector/YADetectorFF.git`)
+
+EXTERNAL SOURCES:
+  TTMLKit:
+    :git: https://github.com/YADetector/TTMLKit.git
+  YADetector:
+    :path: "../"
+  YADetectorFF:
+    :git: https://github.com/YADetector/YADetectorFF.git
+
+CHECKOUT OPTIONS:
+  TTMLKit:
+    :commit: b58b90262ef77ef5cdb65e42ca46ed3acd02a629
+    :git: https://github.com/YADetector/TTMLKit.git
+  YADetectorFF:
+    :commit: cfcf624408af8bd39c4be9bbc721e87d0e43d7e8
+    :git: https://github.com/YADetector/YADetectorFF.git
+
+SPEC CHECKSUMS:
+  TTMLKit: 94d83c04e1b50098a35b1ec5100e6e9b018c3213
+  YADetector: 276dd966dcf0dc779f0d85303c5cf10712539d85
+  YADetectorFF: da243c9f31938c9569edc2070d5f350bb4fd1356
+
+PODFILE CHECKSUM: 97e80e776447d435fa753087660838b1c7673b19
+
+COCOAPODS: 1.10.0
