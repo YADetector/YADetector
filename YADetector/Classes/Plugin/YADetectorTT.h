@@ -24,6 +24,7 @@ public:
     
 private:
     void initNulls();
+    bool fileExists(const char *path);
     bool loadSymbols();
     std::string getLibPath();
     std::string getModelPath();

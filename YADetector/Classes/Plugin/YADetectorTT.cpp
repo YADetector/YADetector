@@ -17,6 +17,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <dirent.h>
+#include <sys/stat.h>
 #include <sstream>
 #include <stdexcept>
 
@@ -121,23 +122,38 @@ TTDetector::TTDetector(int maxFaceCount, YADPixelFormat pixFormat, YADDataType d
 {
     YLOGV("YADetectorTT ctor");
     
-     initNulls();
+    initNulls();
     
     mMaxFaceNum = std::min(maxFaceCount, YAD_MAX_FACE_NUM);
     
     if (!loadSymbols()) {
+        YLOGW("symbols not loaded");
+        mInitCheck = YAD_SYMBOLS_NOT_LOADED;
+        return;
+    }
+    
+    std::string modelPath = getModelPath();
+    if (!fileExists(modelPath.c_str())) {
+        YLOGE("model file not found");
+        mInitCheck = YAD_MODEL_NOT_FOUND;
+        return;
+    }
+    std::string extraModelPath = getExtraModelPath();
+    if (!fileExists(extraModelPath.c_str())) {
+        YLOGE("extra model file not found");
+        mInitCheck = YAD_MODEL_NOT_FOUND;
         return;
     }
     
     unsigned long long flags = 0x20007f;
-    int ret = gCreateHandler(flags, getModelPath().c_str(), &mHandle);
+    int ret = gCreateHandler(flags, modelPath.c_str(), &mHandle);
     if (ret) {
-        YLOGE("create handler failed, err: %d\n", ret);
+        YLOGE("create handler failed, err: %d", ret);
         return;
     }
     
     flags = 0x900;
-    gAddExtraModel(mHandle, flags, getExtraModelPath().c_str());
+    gAddExtraModel(mHandle, flags, extraModelPath.c_str());
     
     mInitCheck = YAD_OK;
 }
@@ -162,6 +178,13 @@ void TTDetector::initNulls()
 int TTDetector::initCheck() const
 {
     return mInitCheck;
+}
+
+bool TTDetector::fileExists(const char *path)
+{
+    struct stat pathStat;
+    memset(&pathStat, 0, sizeof(struct stat));
+    return stat(path, &pathStat) == 0;
 }
 
 bool TTDetector::loadSymbols()
@@ -271,22 +294,29 @@ int TTDetector::detect(YADDetectImage *detectImage, YADDetectInfo *detectInfo, Y
     }
     
     if (!loadSymbols()) {
-        return ERROR_YAD_SYMBOLS_NOT_LOADED;
+        YLOGE("symbols not loaded");
+        return YAD_SYMBOLS_NOT_LOADED;
+    }
+    
+    CVPixelBufferRef pixelBuffer = (CVPixelBufferRef)detectImage->data;
+    if (!pixelBuffer) {
+        YLOGE("data is null");
+        return YAD_BAD_VALUE;
     }
     
     int pixelFormat = translatePixelFormat(detectImage->format);
     if (pixelFormat == INT_MAX) {
-        return ERROR_YAD_FORMAT_UNSUPPORTED;
+        YLOGE("format unsupported");
+        return YAD_FORMAT_UNSUPPORTED;
     }
     
     int screenOrient = translateRotate(detectInfo->rotate_mode);
     if (screenOrient == INT_MAX) {
-        return ERROR_YAD_ROTATE_UNSUPPORTED;
+        YLOGE("rotate unsupported");
+        return YAD_ROTATE_UNSUPPORTED;
     }
 
     unsigned long long flags = 0x13f;
-    
-    CVPixelBufferRef pixelBuffer = (CVPixelBufferRef)detectImage->data;
     CVPixelBufferLockBaseAddress(pixelBuffer, 0);
     unsigned char *baseAddress = (unsigned char *)CVPixelBufferGetBaseAddressOfPlane(pixelBuffer, 0);
     
@@ -297,7 +327,7 @@ int TTDetector::detect(YADDetectImage *detectImage, YADDetectInfo *detectInfo, Y
     if (ret) {
         YLOGE("DoPredict failed, ret: %d", ret);
         CVPixelBufferUnlockBaseAddress(pixelBuffer, 0);
-        return ERROR_YAD_DETECT;
+        return YAD_DETECT_FAILED;
     }
     
     CVPixelBufferUnlockBaseAddress(pixelBuffer, 0);
