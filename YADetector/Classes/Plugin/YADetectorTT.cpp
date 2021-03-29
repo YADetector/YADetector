@@ -31,22 +31,22 @@
 extern "C" {
 #endif
 
-typedef enum TTOrientation {
-    TT_ORIENTATION_UP = 0,
-    TT_ORIENTATION_RIGHT,
-    TT_ORIENTATION_BOTTOM,
-    TT_ORIENTATION_LEFT,
-} TTOrientation;
+enum {
+    kOrientation_UP = 0,
+    kOrientation_RIGHT,
+    kOrientation_BOTTOM,
+    kOrientation_LEFT,
+};
 
 // tt facedetect支持范围: 0~3
-typedef enum TTPixelFormat {
+enum {
     kPixelFormat_RGBA8888 = 0,
     kPixelFormat_BGRA8888,
     kPixelFormat_BGR888,
     kPixelFormat_RGB888,
     kPixelFormat_NV12,
     kPixelFormat_GRAY,
-} tt_pixelformat;
+};
 
 typedef struct tt_rect_t
 {
@@ -274,7 +274,7 @@ int TTDetector::detect(YADDetectImage *detectImage, YADDetectInfo *detectInfo, Y
         return ERROR_YAD_SYMBOLS_NOT_LOADED;
     }
     
-    unsigned int pixelFormat = translatePixelFormat(detectImage->format);
+    int pixelFormat = translatePixelFormat(detectImage->format);
     if (pixelFormat == INT_MAX) {
         return ERROR_YAD_FORMAT_UNSUPPORTED;
     }
@@ -326,13 +326,13 @@ int TTDetector::translateRotate(YADRotateMode rotateMode)
 {
     switch (rotateMode) {
         case YAD_ROTATE_0:
-            return TT_ORIENTATION_UP;
+            return kOrientation_UP;
         case YAD_ROTATE_90:
-            return TT_ORIENTATION_RIGHT;
+            return kOrientation_RIGHT;
         case YAD_ROTATE_180:
-            return TT_ORIENTATION_BOTTOM;
+            return kOrientation_BOTTOM;
         case YAD_ROTATE_270:
-            return TT_ORIENTATION_LEFT;
+            return kOrientation_LEFT;
         default:
             break;
     }
