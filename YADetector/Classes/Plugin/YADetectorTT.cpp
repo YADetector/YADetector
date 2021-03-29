@@ -293,11 +293,6 @@ int TTDetector::detect(YADDetectImage *detectImage, YADDetectInfo *detectInfo, Y
         return YAD_BAD_VALUE;
     }
     
-    if (!loadSymbols()) {
-        YLOGE("symbols not loaded");
-        return YAD_SYMBOLS_NOT_LOADED;
-    }
-    
     CVPixelBufferRef pixelBuffer = (CVPixelBufferRef)detectImage->data;
     if (!pixelBuffer) {
         YLOGE("data is null");
@@ -310,10 +305,15 @@ int TTDetector::detect(YADDetectImage *detectImage, YADDetectInfo *detectInfo, Y
         return YAD_FORMAT_UNSUPPORTED;
     }
     
-    int screenOrient = translateRotate(detectInfo->rotate_mode);
-    if (screenOrient == INT_MAX) {
+    int orientation = translateOrientation(detectInfo->rotate_mode);
+    if (orientation == INT_MAX) {
         YLOGE("rotate unsupported");
         return YAD_ROTATE_UNSUPPORTED;
+    }
+    
+    if (!mHandle) {
+        YLOGE("handle is null");
+        return YAD_INVALID_OPERATION;
     }
 
     unsigned long long flags = 0x13f;
@@ -323,7 +323,7 @@ int TTDetector::detect(YADDetectImage *detectImage, YADDetectInfo *detectInfo, Y
     // FIXME support flags
     tt_faces_info_t facesInfo;
     memset(&facesInfo, 0, sizeof(tt_faces_info_t));
-    int ret = gDoPredict(mHandle, baseAddress, pixelFormat, detectImage->width, detectImage->height, detectImage->stride, screenOrient, flags, &facesInfo);
+    int ret = gDoPredict(mHandle, baseAddress, pixelFormat, detectImage->width, detectImage->height, detectImage->stride, orientation, flags, &facesInfo);
     if (ret) {
         YLOGE("DoPredict failed, ret: %d", ret);
         CVPixelBufferUnlockBaseAddress(pixelBuffer, 0);
@@ -352,23 +352,6 @@ int TTDetector::detect(YADDetectImage *detectImage, YADDetectInfo *detectInfo, Y
     return YAD_OK;
 }
 
-int TTDetector::translateRotate(YADRotateMode rotateMode)
-{
-    switch (rotateMode) {
-        case YAD_ROTATE_0:
-            return kOrientation_UP;
-        case YAD_ROTATE_90:
-            return kOrientation_RIGHT;
-        case YAD_ROTATE_180:
-            return kOrientation_BOTTOM;
-        case YAD_ROTATE_270:
-            return kOrientation_LEFT;
-        default:
-            break;
-    }
-    return INT_MAX;
-}
-
 int TTDetector::translatePixelFormat(YADPixelFormat pixelFormat)
 {
     switch (pixelFormat) {
@@ -380,6 +363,23 @@ int TTDetector::translatePixelFormat(YADPixelFormat pixelFormat)
             return kPixelFormat_BGRA8888;
         case YAD_PIX_FMT_RGBA8888:
             return kPixelFormat_RGBA8888;
+        default:
+            break;
+    }
+    return INT_MAX;
+}
+
+int TTDetector::translateOrientation(YADRotateMode rotateMode)
+{
+    switch (rotateMode) {
+        case YAD_ROTATE_0:
+            return kOrientation_UP;
+        case YAD_ROTATE_90:
+            return kOrientation_RIGHT;
+        case YAD_ROTATE_180:
+            return kOrientation_BOTTOM;
+        case YAD_ROTATE_270:
+            return kOrientation_LEFT;
         default:
             break;
     }
