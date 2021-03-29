@@ -31,12 +31,22 @@
 extern "C" {
 #endif
 
-typedef enum tt_orientation {
-    TT_ORIENTATION_UP       = 0,
-    TT_ORIENTATION_RIGHT    = 1,
-    TT_ORIENTATION_BOTTOM   = 2,
-    TT_ORIENTATION_LEFT     = 3,
-} tt_orientation;
+typedef enum TTOrientation {
+    TT_ORIENTATION_UP = 0,
+    TT_ORIENTATION_RIGHT,
+    TT_ORIENTATION_BOTTOM,
+    TT_ORIENTATION_LEFT,
+} TTOrientation;
+
+// tt facedetect支持范围: 0~3
+typedef enum TTPixelFormat {
+    kPixelFormat_RGBA8888 = 0,
+    kPixelFormat_BGRA8888,
+    kPixelFormat_BGR888,
+    kPixelFormat_RGB888,
+    kPixelFormat_NV12,
+    kPixelFormat_GRAY,
+} tt_pixelformat;
 
 typedef struct tt_rect_t
 {
@@ -127,7 +137,7 @@ TTDetector::TTDetector(int maxFaceCount, YADPixelFormat pixFormat, YADDataType d
     }
     
     flags = 0x900;
-    gAddExtraModel(mHandle, 0x900, getExtraModelPath().c_str());
+    gAddExtraModel(mHandle, flags, getExtraModelPath().c_str());
     
     mInitCheck = YAD_OK;
 }
@@ -253,52 +263,46 @@ std::string TTDetector::getLibDir()
     return std::string(path) + "/Frameworks";
 }
 
-int TTDetector::translateRotate(YADRotateMode rotateMode)
-{
-    switch (rotateMode) {
-        case YAD_ROTATE_0:
-            return TT_ORIENTATION_UP;
-        case YAD_ROTATE_90:
-            return TT_ORIENTATION_RIGHT;
-        case YAD_ROTATE_180:
-            return TT_ORIENTATION_BOTTOM;
-        case YAD_ROTATE_270:
-            return TT_ORIENTATION_LEFT;
-        default:
-            break;
-    }
-}
-
 int TTDetector::detect(YADDetectImage *detectImage, YADDetectInfo *detectInfo, YADFeatureInfo *featureInfo)
 {
-    assert(detectImage != NULL);
-    assert(detectInfo != NULL);
-    assert(featureInfo != NULL);
-
-    memset(featureInfo, 0, sizeof(YADFeatureInfo));
-    
-    if (!loadSymbols()) {
-        return YAD_INVALID_OPERATION;
+    if (!detectImage || !detectInfo || !featureInfo) {
+        YLOGE("params is null");
+        return YAD_BAD_VALUE;
     }
     
-    unsigned int pixelFormatType = 0;
+    if (!loadSymbols()) {
+        return ERROR_YAD_SYMBOLS_NOT_LOADED;
+    }
+    
+    unsigned int pixelFormat = translatePixelFormat(detectImage->format);
+    if (pixelFormat == INT_MAX) {
+        return ERROR_YAD_FORMAT_UNSUPPORTED;
+    }
+    
     int screenOrient = translateRotate(detectInfo->rotate_mode);
+    if (screenOrient == INT_MAX) {
+        return ERROR_YAD_ROTATE_UNSUPPORTED;
+    }
+
     unsigned long long flags = 0x13f;
     
     CVPixelBufferRef pixelBuffer = (CVPixelBufferRef)detectImage->data;
     CVPixelBufferLockBaseAddress(pixelBuffer, 0);
     unsigned char *baseAddress = (unsigned char *)CVPixelBufferGetBaseAddressOfPlane(pixelBuffer, 0);
     
-    // FIXME support pixelFormatType, flags
+    // FIXME support flags
     tt_faces_info_t facesInfo;
-    int ret = gDoPredict(mHandle, baseAddress, pixelFormatType, detectImage->width, detectImage->height, detectImage->stride, screenOrient, flags, &facesInfo);
+    memset(&facesInfo, 0, sizeof(tt_faces_info_t));
+    int ret = gDoPredict(mHandle, baseAddress, pixelFormat, detectImage->width, detectImage->height, detectImage->stride, screenOrient, flags, &facesInfo);
     if (ret) {
         YLOGE("DoPredict failed, ret: %d", ret);
         CVPixelBufferUnlockBaseAddress(pixelBuffer, 0);
-        return YAD_UNKNOWN_ERROR;
+        return ERROR_YAD_DETECT;
     }
     
     CVPixelBufferUnlockBaseAddress(pixelBuffer, 0);
+    
+    //YLOGD("DoPredict succ, num_faces: %d", facesInfo.num_faces);
     
     // 转换结构
     featureInfo->num_faces = std::min(facesInfo.num_faces, mMaxFaceNum);
@@ -318,6 +322,40 @@ int TTDetector::detect(YADDetectImage *detectImage, YADDetectInfo *detectInfo, Y
     return YAD_OK;
 }
 
+int TTDetector::translateRotate(YADRotateMode rotateMode)
+{
+    switch (rotateMode) {
+        case YAD_ROTATE_0:
+            return TT_ORIENTATION_UP;
+        case YAD_ROTATE_90:
+            return TT_ORIENTATION_RIGHT;
+        case YAD_ROTATE_180:
+            return TT_ORIENTATION_BOTTOM;
+        case YAD_ROTATE_270:
+            return TT_ORIENTATION_LEFT;
+        default:
+            break;
+    }
+    return INT_MAX;
+}
+
+int TTDetector::translatePixelFormat(YADPixelFormat pixelFormat)
+{
+    switch (pixelFormat) {
+        case YAD_PIX_FMT_BGR888:
+            return kPixelFormat_BGR888;
+        case YAD_PIX_FMT_RGB888:
+            return kPixelFormat_RGB888;
+        case YAD_PIX_FMT_BGRA8888:
+            return kPixelFormat_BGRA8888;
+        case YAD_PIX_FMT_RGBA8888:
+            return kPixelFormat_RGBA8888;
+        default:
+            break;
+    }
+    return INT_MAX;
+}
+
 static Detector *createDetector(int maxFaceCount, YADPixelFormat pixFormat, YADDataType dataType)
 {
     return new TTDetector(maxFaceCount, pixFormat, dataType);
@@ -335,6 +373,11 @@ static void SetLog(Log log)
 
 static bool sniffDetector(int maxFaceCount, YADPixelFormat pixFormat, YADDataType dataType, float *confidence)
 {
+    if (!confidence) {
+        YLOGE("confidence is null");
+        return false;
+    }
+    
     if (pixFormat == YAD_PIX_FMT_BGRA8888 && dataType == YAD_DATA_TYPE_IOS_PIXEL_BUFFER) {
         *confidence = 0.8f;
     } else {

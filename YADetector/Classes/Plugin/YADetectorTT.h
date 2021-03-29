@@ -30,6 +30,7 @@ private:
     std::string getExtraModelPath();
     std::string getLibDir();
     int translateRotate(YADRotateMode rotateMode);
+    int translatePixelFormat(YADPixelFormat pixelFormat);
     
     int mInitCheck;
     int mMaxFaceNum;

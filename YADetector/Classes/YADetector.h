@@ -20,6 +20,7 @@ extern "C" {
 
 // 错误码
 enum {
+    // 公共错误
     YAD_OK                  = 0,      // Preferred constant for checking success.
     YAD_NO_ERROR            = YAD_OK, // Deprecated synonym for `OK`. Prefer `OK` because it doesn't conflict with Windows.
 
@@ -42,6 +43,14 @@ enum {
     YAD_UNKNOWN_TRANSACTION = -EBADMSG,
     YAD_FDS_NOT_ALLOWED     = (YAD_UNKNOWN_ERROR + 7),
     YAD_UNEXPECTED_NULL     = (YAD_UNKNOWN_ERROR + 8),
+    
+    // 私有错误
+    YAD_DETECT_ERROR_BASE   = -1000,
+    
+    ERROR_YAD_SYMBOLS_NOT_LOADED    = YAD_DETECT_ERROR_BASE,
+    ERROR_YAD_FORMAT_UNSUPPORTED    = YAD_DETECT_ERROR_BASE - 1,
+    ERROR_YAD_ROTATE_UNSUPPORTED    = YAD_DETECT_ERROR_BASE - 2,
+    ERROR_YAD_DETECT                = YAD_DETECT_ERROR_BASE - 3,
 };
 
 // 点
