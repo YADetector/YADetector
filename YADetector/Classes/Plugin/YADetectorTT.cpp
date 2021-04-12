@@ -393,12 +393,12 @@ static Detector *createDetector(YADConfig &config)
     return new TTDetector(config);
 }
 
-static const char *GetName()
+static const char *getName()
 {
     return "YADetectorTT";
 }
 
-static void SetLog(Log log)
+static void setLog(Log log)
 {
     
 }
@@ -427,8 +427,8 @@ static bool sniffDetector(YADConfig &config, float *confidence)
 YAD::Plugin *createYADetectorTTPlugin()
 {
     YAD::Plugin *plugin = new YAD::Plugin;
-    plugin->getName = YAD::GetName;
-    plugin->setLog = YAD::SetLog;
+    plugin->getName = YAD::getName;
+    plugin->setLog = YAD::setLog;
     plugin->sniff = YAD::sniffDetector;
     plugin->createDetector = YAD::createDetector;
     return plugin;
