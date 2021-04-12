@@ -1,5 +1,5 @@
-#ifndef YAD_UTILS_MUTEX_H
-#define YAD_UTILS_MUTEX_H
+#ifndef YAD_MUTEX_H
+#define YAD_MUTEX_H
 
 #include <stdint.h>
 #include <sys/types.h>
@@ -118,4 +118,4 @@ typedef Mutex::Autolock AutoMutex;
 }; // namespace YAD
 // ---------------------------------------------------------------------------
 
-#endif // YAD_UTILS_MUTEX_H
+#endif // YAD_MUTEX_H

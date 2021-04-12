@@ -3,11 +3,13 @@
 //  YAD
 //
 
+#ifndef YAD_DETECTOR_h
+#define YAD_DETECTOR_h
+
 #include <stdarg.h>
 #include <errno.h>
-
-#ifndef YADetector_h
-#define YADetector_h
+#include <string>
+#include <unordered_map>
 
 // 人脸关键点Landmark使用106点，同商汤科技，face++
 
@@ -109,7 +111,7 @@ typedef enum YADRotateMode {
 typedef enum YADDataType {
     YAD_DATA_TYPE_NONE = -1,
     YAD_DATA_TYPE_RAW ,             // 裸数据，数据为 char *
-    YAD_DATA_TYPE_IOS_UI_IMAGE,     // iOS UIImage, 实际类型：UIImage
+    YAD_DATA_TYPE_IOS_UIIMAGE,      // iOS UIImage, 实际类型：UIImage
     YAD_DATA_TYPE_IOS_PIXEL_BUFFER, // iOS PixelBuffer, 实际类型：CVPixelBufferRef
     YAD_DATA_TYPE_MAX
 } YADImageType;
@@ -147,6 +149,12 @@ typedef struct YADFeatureInfo {
     // ...预留，可能还有手势识别等feature
 } YADFeatureInfo;
 
+typedef std::unordered_map<std::string, std::string> YADConfig;
+
+#define kYADMaxFaceCount    "max_face_count"    // value: int
+#define kYADPixFormat       "pix_format"        // value: YADPixelFormat
+#define kYADDataType        "data_type"         // value: YADDataType
+
 #if defined(__cplusplus)
 }
 #endif
@@ -159,10 +167,10 @@ public:
     // 是否存在Detector插件
     static bool Exists();
     // 创建Detector
-    static Detector *Create(int maxFaceCount, YADPixelFormat pixFormat, YADDataType dataType);
+    static Detector *Create(YADConfig &config);
     
     Detector() {}
-    Detector(int maxFaceCount, YADPixelFormat pixFormat, YADDataType dataType) {}
+    Detector(YADConfig &config) {}
     virtual ~Detector() {}
     // 对象构造后是否正常，返回0正常，负数异常
     virtual int initCheck() const = 0;
@@ -190,9 +198,9 @@ typedef const char *(*GetNameFunc)();
 typedef void (*SetLogFunc)(Log log);
 // 嗅探。插件根据参数返回confidence。
 // confidence范围：0~1.0，该值越高，插件优先级就越高。主要用于在多个都能实现功能的插件中，选取优化最好的插件。
-typedef bool (*SniffFunc)(int maxFaceCount, YADPixelFormat pixFormat, YADDataType dataType, float *confidence);
+typedef bool (*SniffFunc)(YADConfig &config, float *confidence);
 // 检测
-typedef Detector *(*CreateDetectorFunc)(int maxFaceCount, YADPixelFormat pixFormat, YADDataType dataType);
+typedef Detector *(*CreateDetectorFunc)(YADConfig &config);
 
 // 插件类，框架支持第三方插件，用户可以扩展自定义。
 // 用户需要以Detector为基类，派生一个自己的XXXDetector。并实现和导出"createYADetectorPlugin"函数。
@@ -207,5 +215,5 @@ struct Plugin {
 
 }  // namespace YAD
 
-#endif /* YADetector_h */
+#endif /* YAD_DETECTOR_h */
 

@@ -41,16 +41,27 @@ PluginManager::~PluginManager()
     
 }
 
-Detector *PluginManager::createDetector(int maxFaceCount, YADPixelFormat pixFormat, YADDataType dataType)
+size_t PluginManager::getPluginCount()
 {
     std::unique_lock<std::mutex> lock(mMutex);
+    
+    return mPlugins.size();
+}
+    
+Detector *PluginManager::createDetector(YADConfig &config)
+{
+    std::unique_lock<std::mutex> lock(mMutex);
+    
+    int maxFaceCount = std::stoi(config[kYADMaxFaceCount]);
+    YADPixelFormat pixFormat = (YADPixelFormat)std::stoi(config[kYADPixFormat]);
+    YADDataType dataType = (YADDataType)std::stoi(config[kYADDataType]);
     
     // 查询插件是否支持对应的参数，并且选择优化最好的插件
     Plugin *plugin = nullptr;
     float confidence = 0.0f;
     for (std::list<Plugin *>::iterator it = mPlugins.begin(); it != mPlugins.end(); ++it) {
         float newConfidence;
-        if ((*it)->sniff(maxFaceCount, pixFormat, dataType, &newConfidence)) {
+        if ((*it)->sniff(config, &newConfidence)) {
             if (newConfidence > confidence) {
                 confidence = newConfidence;
                 plugin = (*it);
@@ -66,7 +77,7 @@ Detector *PluginManager::createDetector(int maxFaceCount, YADPixelFormat pixForm
     YLOGI("choose %s plugin, maxFaceCount: %d pixFormat: %d dataType: %d confidence: %f", plugin->getName(), maxFaceCount, pixFormat, dataType, confidence);
     
     // 否则调用插件创建detector
-    return plugin->createDetector(maxFaceCount, pixFormat, dataType);
+    return plugin->createDetector(config);
 }
 
 void PluginManager::registerBuildInPlugins()

@@ -5,11 +5,11 @@
 //  YAD
 //
 
+#ifndef YAD_DETECTOR_TT_h
+#define YAD_DETECTOR_TT_h
+
 #include "YADetector.h"
 #include <string>
-
-#ifndef YADetectorTT_h
-#define YADetectorTT_h
 
 namespace YAD {
 
@@ -17,7 +17,7 @@ class TTDetector : public Detector
 {
 public:
     TTDetector();
-    TTDetector(int maxFaceCount, YADPixelFormat pixFormat, YADDataType dataType);
+    TTDetector(YADConfig &config);
     virtual ~TTDetector();
     virtual int initCheck() const;
     virtual int detect(YADDetectImage *detectImage, YADDetectInfo *detectInfo, YADFeatureInfo *featureInfo);
@@ -45,6 +45,6 @@ private:
 
 extern "C" YAD::Plugin *createYADetectorTTPlugin();
 
-#endif /* YADetectorTT_h */
+#endif /* YAD_DETECTOR_TT_h */
 
 #endif // WITH_YAD_TT

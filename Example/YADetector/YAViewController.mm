@@ -20,7 +20,11 @@
     [super viewDidLoad];
 	// Do any additional setup after loading the view, typically from a nib.
     
-    YAD::Detector *detector = YAD::Detector::Create(3, YAD_PIX_FMT_BGRA8888, YAD_DATA_TYPE_IOS_PIXEL_BUFFER);
+    YADConfig config;
+    config[kYADMaxFaceCount] = std::to_string(3);
+    config[kYADPixFormat] = std::to_string(YAD_PIX_FMT_BGRA8888);
+    config[kYADDataType] = std::to_string(YAD_DATA_TYPE_IOS_PIXEL_BUFFER);
+    YAD::Detector *detector = YAD::Detector::Create(config);
     NSLog(@"detector: %p", detector);
     if (detector) {
         NSLog(@"detector initCheck: %d", detector->initCheck());

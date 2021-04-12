@@ -118,9 +118,11 @@ TTDetector::TTDetector()
     initNulls();
 }
 
-TTDetector::TTDetector(int maxFaceCount, YADPixelFormat pixFormat, YADDataType dataType)
+TTDetector::TTDetector(YADConfig &config)
 {
     YLOGV("YADetectorTT ctor");
+    
+    int maxFaceCount = std::stoi(config[kYADMaxFaceCount]);
     
     initNulls();
     
@@ -386,9 +388,9 @@ int TTDetector::translateOrientation(YADRotateMode rotateMode)
     return INT_MAX;
 }
 
-static Detector *createDetector(int maxFaceCount, YADPixelFormat pixFormat, YADDataType dataType)
+static Detector *createDetector(YADConfig &config)
 {
-    return new TTDetector(maxFaceCount, pixFormat, dataType);
+    return new TTDetector(config);
 }
 
 static const char *GetName()
@@ -401,12 +403,15 @@ static void SetLog(Log log)
     
 }
 
-static bool sniffDetector(int maxFaceCount, YADPixelFormat pixFormat, YADDataType dataType, float *confidence)
+static bool sniffDetector(YADConfig &config, float *confidence)
 {
     if (!confidence) {
         YLOGE("confidence is null");
         return false;
     }
+    
+    YADPixelFormat pixFormat = (YADPixelFormat)std::stoi(config[kYADPixFormat]);
+    YADDataType dataType = (YADDataType)std::stoi(config[kYADDataType]);
     
     if (pixFormat == YAD_PIX_FMT_BGRA8888 && dataType == YAD_DATA_TYPE_IOS_PIXEL_BUFFER) {
         *confidence = 0.8f;

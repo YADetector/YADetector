@@ -15,9 +15,9 @@ bool Detector::Exists()
 }
 
 // static
-Detector *Detector::Create(int maxFaceCount, YADPixelFormat pixFormat, YADDataType dataType)
+Detector *Detector::Create(YADConfig &config)
 {
-    return PluginManager::getInstance().createDetector(maxFaceCount, pixFormat, dataType);
+    return PluginManager::getInstance().createDetector(config);
 }
 
 } // namespace YAD

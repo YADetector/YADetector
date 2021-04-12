@@ -1,5 +1,5 @@
-#ifndef YAD_UTILS_SINGLETON_H
-#define YAD_UTILS_SINGLETON_H
+#ifndef YAD_SINGLETON_H
+#define YAD_SINGLETON_H
 
 #include <stdint.h>
 #include <sys/types.h>
@@ -56,5 +56,5 @@ private:
 // ---------------------------------------------------------------------------
 }; // namespace YAD
 
-#endif // YAD_UTILS_SINGLETON_H
+#endif // YAD_SINGLETON_H
 

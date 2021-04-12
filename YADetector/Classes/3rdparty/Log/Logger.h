@@ -3,11 +3,11 @@
 //  YAD
 //
 
+#ifndef YAD_LOGGER_h
+#define YAD_LOGGER_h
+
 #include "Singleton.h"
 #include <stdarg.h>
-
-#ifndef Logger_h
-#define Logger_h
 
 namespace YAD {
 
@@ -49,4 +49,4 @@ private:
 
 }  // namespace YAD
 
-#endif /* Logger_h */
+#endif /* YAD_LOGGER_h */

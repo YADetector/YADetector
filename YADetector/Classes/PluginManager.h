@@ -3,14 +3,14 @@
 //  YAD
 //
 
+#ifndef YAD_PLUGIN_MANAGER_h
+#define YAD_PLUGIN_MANAGER_h
+
 #include "YADetector.h"
 #include "Singleton.h"
 #include <mutex>
 #include <list>
 #include <string>
-
-#ifndef PluginManager_h
-#define PluginManager_h
 
 namespace YAD {
 
@@ -19,8 +19,8 @@ public:
     PluginManager();
     ~PluginManager();
     
-    size_t getPluginCount() { return mPlugins.size(); }
-    Detector *createDetector(int maxFaceCount, YADPixelFormat pixFormat, YADDataType dataType);
+    size_t getPluginCount();
+    Detector *createDetector(YADConfig &config);
     
 private:
     void registerBuildInPlugins();
@@ -40,4 +40,4 @@ private:
 
 }  // namespace YAD
 
-#endif /* PluginManager_h */
+#endif /* YAD_PLUGIN_MANAGER_h */

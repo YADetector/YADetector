@@ -5,8 +5,8 @@
 //  YAD
 //
 
-#ifndef Log_IOS_h
-#define Log_IOS_h
+#ifndef YAD_LOG_IOS_h
+#define YAD_LOG_IOS_h
 
 namespace YAD {
 
@@ -14,6 +14,6 @@ void logImpl(const char *message);
 
 }  // namespace YAD
 
-#endif /* Log_IOS_h */
+#endif /* YAD_LOG_IOS_h */
 
 #endif
