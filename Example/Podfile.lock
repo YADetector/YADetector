@@ -18,10 +18,10 @@ EXTERNAL SOURCES:
 
 CHECKOUT OPTIONS:
   TTMLKit:
-    :commit: b58b90262ef77ef5cdb65e42ca46ed3acd02a629
+    :commit: 3d0feb60597a968774e83933a938189e50ba71c0
     :git: https://github.com/YADetector/TTMLKit.git
   YADetectorFF:
-    :commit: cfcf624408af8bd39c4be9bbc721e87d0e43d7e8
+    :commit: 80759f2401a0015ca62fb9841b3a05e1ccf71c60
     :git: https://github.com/YADetector/YADetectorFF.git
 
 SPEC CHECKSUMS:
