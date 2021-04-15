@@ -3,8 +3,8 @@
 //  YAD
 //
 
-#ifndef YAD_DETECTOR_h
-#define YAD_DETECTOR_h
+#ifndef YAD_DETECTOR_H
+#define YAD_DETECTOR_H
 
 #include <stdarg.h>
 #include <errno.h>
@@ -215,5 +215,5 @@ struct Plugin {
 
 }  // namespace YAD
 
-#endif /* YAD_DETECTOR_h */
+#endif /* YAD_DETECTOR_H */
 

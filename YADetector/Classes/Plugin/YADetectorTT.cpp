@@ -23,10 +23,11 @@
 
 // 该实现参考github上的例子：[gistfile1.txt](https://gist.github.com/ctliu3/35c9a9cf88ac8ddd7b3fab05973403e4)
 
-#define YAD_TT_FRAMEWORK_FULL_NAME  "TTMLKit.framework"
-#define YAD_TT_FRAMEWORK_BASE_NAME  "TTMLKit"
-#define YAD_TT_FACE_MODEL           "model/face.model"
-#define YAD_TT_FACE_EXTRA_MODLE     "model/faceext.model"
+#define YAD_TT_FRAMEWORK_DIR            "TTMLKit.framework"
+#define YAD_TT_MODEL_DIR                "model"
+#define YAD_TT_LIB_NAME                 "TTMLKit"
+#define YAD_TT_FACE_MODEL_NAME          "ttface.model"
+#define YAD_TT_FACE_EXTRA_MODLE_NAME    "ttfaceext.model"
 
 #ifdef __cplusplus
 extern "C" {
@@ -122,27 +123,31 @@ TTDetector::TTDetector(YADConfig &config)
 {
     YLOGV("YADetectorTT ctor");
     
-    int maxFaceCount = std::stoi(config[kYADMaxFaceCount]);
-    
     initNulls();
     
-    mMaxFaceNum = std::min(maxFaceCount, YAD_MAX_FACE_NUM);
-    
+    mMaxFaceNum = std::stoi(config[kYADMaxFaceCount]);
+    mMaxFaceNum = std::min(mMaxFaceNum, YAD_MAX_FACE_NUM);
+    // 有些情况下，调用者希望定制资源，调用者可以在config增加字段实现该功能，key: 默认资源名，value: 资源指定的路径
+    // 但是需要注意的是，仍旧会优先使用App本身的资源
+    mLibPath = config[YAD_TT_LIB_NAME];
+    mFaceModelPath = config[YAD_TT_FACE_MODEL_NAME];
+    mFaceExtraModelPath = config[YAD_TT_FACE_EXTRA_MODLE_NAME];
+
     if (!loadSymbols()) {
-        YLOGW("symbols not loaded");
+        YLOGE("symbols not loaded");
         mInitCheck = YAD_SYMBOLS_NOT_LOADED;
         return;
     }
     
     std::string modelPath = getModelPath();
-    if (!fileExists(modelPath.c_str())) {
-        YLOGE("model file not found");
+    if (!fileExists(modelPath)) {
+        YLOGE("model file not found, path: %s", modelPath.c_str());
         mInitCheck = YAD_MODEL_NOT_FOUND;
         return;
     }
     std::string extraModelPath = getExtraModelPath();
-    if (!fileExists(extraModelPath.c_str())) {
-        YLOGE("extra model file not found");
+    if (!fileExists(extraModelPath)) {
+        YLOGE("extra model file not found, path: %s", extraModelPath.c_str());
         mInitCheck = YAD_MODEL_NOT_FOUND;
         return;
     }
@@ -175,6 +180,9 @@ void TTDetector::initNulls()
     mInitCheck = YAD_NO_INIT;
     mMaxFaceNum = YAD_MAX_FACE_NUM;
     mHandle = NULL;
+    mLibPath = "";
+    mFaceModelPath = "";
+    mFaceExtraModelPath = "";
 }
 
 int TTDetector::initCheck() const
@@ -182,24 +190,30 @@ int TTDetector::initCheck() const
     return mInitCheck;
 }
 
-bool TTDetector::fileExists(const char *path)
+bool TTDetector::fileExists(std::string path)
 {
     struct stat pathStat;
     memset(&pathStat, 0, sizeof(struct stat));
-    return stat(path, &pathStat) == 0;
+    return stat(path.c_str(), &pathStat) == 0;
 }
 
 bool TTDetector::loadSymbols()
 {
     std::unique_lock<std::mutex> lock(gLibMutex);
 
+    // 缓存句柄，增加加载速度
     if (!gFirst) {
         return (gLibHandle != NULL);
     }
 
     gFirst = false;
 
-    gLibHandle = dlopen(getLibPath().c_str(), RTLD_NOW);
+    std::string libPath = getLibPath();
+    if (!fileExists(libPath)) {
+        YLOGE("lib not found, path: %s", libPath.c_str());
+        return false;
+    }
+    gLibHandle = dlopen(libPath.c_str(), RTLD_NOW);
     if (gLibHandle == NULL) {
         YLOGE("dlopen failed\n");
         return false;
@@ -232,26 +246,12 @@ bool TTDetector::loadSymbols()
     return true;
     
 fail:
+    dlclose(gLibHandle);
     gLibHandle = NULL;
     return false;
 }
 
-std::string TTDetector::getLibPath()
-{
-    return getLibDir() + "/" + YAD_TT_FRAMEWORK_FULL_NAME + "/" + YAD_TT_FRAMEWORK_BASE_NAME;
-}
-
-std::string TTDetector::getModelPath()
-{
-    return getLibDir() + "/" + YAD_TT_FRAMEWORK_FULL_NAME + "/" + YAD_TT_FACE_MODEL;
-}
-
-std::string TTDetector::getExtraModelPath()
-{
-    return getLibDir() + "/" + YAD_TT_FRAMEWORK_FULL_NAME + "/" + YAD_TT_FACE_EXTRA_MODLE;
-}
-
-std::string TTDetector::getLibDir()
+std::string TTDetector::getAppLibDirectory()
 {
     CFBundleRef mainBundle;
     CFURLRef bundleUrl;
@@ -286,6 +286,59 @@ std::string TTDetector::getLibDir()
     CFRelease(sr);
 
     return std::string(path) + "/Frameworks";
+}
+
+std::string TTDetector::getDefalutLibDirectory()
+{
+    return (getAppLibDirectory() + "/" + YAD_TT_FRAMEWORK_DIR);
+}
+
+std::string TTDetector::getDefalutModelDirectory()
+{
+    return (getAppLibDirectory() + "/" + YAD_TT_FRAMEWORK_DIR + "/" + YAD_TT_MODEL_DIR);
+}
+
+std::string TTDetector::getDefalutLibPath()
+{
+    return getDefalutLibDirectory() + "/" + YAD_TT_LIB_NAME;
+}
+
+std::string TTDetector::getDefalutModelPath()
+{
+    return getDefalutModelDirectory() + "/" + YAD_TT_FACE_MODEL_NAME;
+}
+
+std::string TTDetector::getDefalutExtraModelPath()
+{
+    return getDefalutModelDirectory() + "/" + YAD_TT_FACE_EXTRA_MODLE_NAME;
+}
+
+// 优先使用App本身的库和资源
+std::string TTDetector::getLibPath()
+{
+    std::string path = getDefalutLibPath();
+    if (fileExists(path)) {
+        return path;
+    }
+    return mLibPath;
+}
+
+std::string TTDetector::getModelPath()
+{
+    std::string path = getDefalutModelPath();
+    if (fileExists(path)) {
+        return path;
+    }
+    return mFaceModelPath;
+}
+
+std::string TTDetector::getExtraModelPath()
+{
+    std::string path = getDefalutExtraModelPath();
+    if (fileExists(path)) {
+        return path;
+    }
+    return mFaceExtraModelPath;
 }
 
 int TTDetector::detect(YADDetectImage *detectImage, YADDetectInfo *detectInfo, YADFeatureInfo *featureInfo)

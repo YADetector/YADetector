@@ -14,14 +14,14 @@
 #include <stdio.h>
 #include <dirent.h>
 #include <sstream>
+#include <regex>
 #include <stdexcept>
 #include "Logger.h"
 #ifdef WITH_YAD_TT
 #include "YADetectorTT.h"
 #endif
 
-#define YAD_PLUGIN_PREFIX       "YADetector"
-#define APPLE_FRAMEWORK_SUFFIX  ".framework"
+#define YAD_PLUGIN_DIRS_KEY     "YAD_PLUGIN_DIRS"
 
 static void logCallback(int level, const char *tag, const char *file, int line, const char *function, const char *format, va_list args)
 {
@@ -74,7 +74,7 @@ Detector *PluginManager::createDetector(YADConfig &config)
         return nullptr;
     }
     
-    YLOGI("choose %s plugin, maxFaceCount: %d pixFormat: %d dataType: %d confidence: %f", plugin->getName(), maxFaceCount, pixFormat, dataType, confidence);
+    YLOGI("select %s plugin, maxFaceCount: %d pixFormat: %d dataType: %d confidence: %f", plugin->getName(), maxFaceCount, pixFormat, dataType, confidence);
     
     // 否则调用插件创建detector
     return plugin->createDetector(config);
@@ -89,32 +89,45 @@ void PluginManager::registerBuildInPlugins()
 
 void PluginManager::registerExtendedPlugins()
 {
-    std::list<std::string> paths;
+    std::list<std::string> pluginDirectories;
     
-    // 搜索插件
-    getAllLibPaths(paths);
-
-    // 添加插件
-    for (std::list<std::string>::iterator it = paths.begin(); it != paths.end(); ++it) {
-        addPlugin(*it);
+    getPluginDirectories(pluginDirectories);
+    for (std::list<std::string>::iterator it = pluginDirectories.begin(); it != pluginDirectories.end(); ++it) {
+        registerPlugins(*it);
     }
 }
 
-void PluginManager::getAllLibPaths(std::list<std::string> &libPaths)
+// 获取所有插件目录，插件注册优先级根据目录添加顺序决定
+void PluginManager::getPluginDirectories(std::list<std::string> &pluginDirectories)
 {
-    // 查找标准库目录下动态库
-    std::string libDir = getLibDir();
+    // 优先添加应用程序的目录
+    pluginDirectories.push_back(getAppLibDirectory());
     
+    // 接着添加用户指定的目录，目录可以多个，以","隔开
+    char *dirs = getenv(YAD_PLUGIN_DIRS_KEY);
+    if (dirs) {
+        char *brkt;
+        for (char *dir = strtok_r(dirs, ",", &brkt); dir; dir = strtok_r(NULL, ",", &brkt)) {
+            pluginDirectories.push_back(dir);
+        }
+    }
+}
+
+void PluginManager::registerPlugins(std::string libDirectory)
+{
     DIR *dir;
     struct dirent *ent;
-    if ((dir = opendir (libDir.c_str())) != NULL) {
+    if ((dir = opendir(libDirectory.c_str())) != NULL) {
         while ((ent = readdir (dir)) != NULL) {
-            std::string s0 = ent->d_name;
-            std::string s1 = "";
-            //YLOGD("%s\n", s0.c_str());
-            if (isYADPlugin(s0, s1)) {
-                YLOGI("found plugin: %s", s0.c_str());
-                libPaths.push_back(libDir + "/" + s0 + "/" + s1);
+            std::string fileName = ent->d_name;
+            // YLOGD("%s\n", fileName.c_str());
+            std::string relativeLibPath = getRelativePluginPath(fileName);
+            if (!relativeLibPath.empty()) {
+                YLOGI("found plugin: %s", fileName.c_str());
+                // 构造全路径
+                std::string fullLibPath = libDirectory + "/" + relativeLibPath;
+                // 添加插件
+                addPlugin(fullLibPath);
             }
         }
         closedir(dir);
@@ -125,7 +138,7 @@ void PluginManager::getAllLibPaths(std::list<std::string> &libPaths)
     }
 }
 
-std::string PluginManager::getLibDir()
+std::string PluginManager::getAppLibDirectory()
 {
     CFBundleRef mainBundle;
     CFURLRef bundleUrl;
@@ -162,26 +175,24 @@ std::string PluginManager::getLibDir()
     return std::string(path) + "/Frameworks";
 }
 
-// 举例动态库为libName=YADetectorXYZ.framework， 返回libBaseName=DetectorXYY
-bool PluginManager::isYADPlugin(std::string &libName, std::string &libBaseName)
+// 动态库插件分两种类型: YADetectorXYZ.framework 或者 libYADetectorXYZ.dylib
+std::string PluginManager::getRelativePluginPath(std::string &fileName)
 {
-    // 搜索APPLE_FRAMEWORK_SUFFIX
-    std::size_t pos = libName.find(APPLE_FRAMEWORK_SUFFIX);
-    if (pos == std::string::npos) {
-        return false;
+    if (std::regex_match(fileName, std::regex("YADetector(.+)\\.framework"))) {
+        std::size_t pos = fileName.find(".framework");
+        std::string libName = fileName.substr(0, pos);
+        return fileName + "/" + libName;
+    } else if (std::regex_match(fileName, std::regex("libYADetector(.+)\\.dylib"))) {
+        return fileName;
     }
-    // 去掉APPLE_FRAMEWORK_SUFFIX后缀的基本名
-    libBaseName = libName.substr(0, pos);
-    std::string prefix = YAD_PLUGIN_PREFIX;
-    // 搜索以YAD_PLUGIN_PREFIX开头的Framework
-    if (libBaseName.size() > prefix.size() && libBaseName.compare(0, prefix.size(), prefix) == 0) {
-        return true;
-    }
-    return false;
+    
+    return "";
 }
 
 void PluginManager::addPlugin(const std::string &libName)
 {
+    YLOGD("add plugin, lib: %s", libName.c_str());
+    
     void *handle = dlopen(libName.c_str(), RTLD_NOW);
     if (!handle) {
         YLOGE("dlopen() failed, libName: %s", libName.c_str());
@@ -192,29 +203,40 @@ void PluginManager::addPlugin(const std::string &libName)
     typedef Plugin *(*CreateYADetectorPluginFunc)();
     CreateYADetectorPluginFunc createYADPlugin = (CreateYADetectorPluginFunc)dlsym(handle, "createYADetectorPlugin");
     if (createYADPlugin) {
-        addPlugin((*createYADPlugin)());
+        if (!addPlugin((*createYADPlugin)())) {
+            YLOGE("add %s plugin failed, libName: %s", libName.c_str());
+            dlclose(handle);
+        }
     } else {
         YLOGE("dlsym() failed, create symbols not found, libName: %s", libName.c_str());
+        dlclose(handle);
     }
 }
 
-void PluginManager::addPlugin(Plugin *plugin)
+bool PluginManager::addPlugin(Plugin *plugin)
 {
     std::unique_lock<std::mutex> lock(mMutex);
 
     if (!plugin) {
-        return;
+        return false;
     }
     
     // 检查合法
-    if (!(plugin->getName && plugin->sniff && plugin->createDetector)) {
-        return;
+    if (!plugin->getName) {
+        YLOGE("plugin getName() is missing");
+        return false;
+    }
+        
+    if (!(plugin->setLog && plugin->sniff && plugin->createDetector)) {
+        YLOGE("%s plugin implementation is missing", plugin->getName());
+        return false;
     }
     
     // 检查重复
     for (std::list<Plugin *>::iterator it = mPlugins.begin(); it != mPlugins.end(); ++it) {
         if (*it == plugin) {
-            return;
+            YLOGW("%s plugin has been added", plugin->getName());
+            return false;
         }
     }
     
@@ -223,7 +245,9 @@ void PluginManager::addPlugin(Plugin *plugin)
     
     mPlugins.push_back(plugin);
     
-    YLOGI("add %s plugin", plugin->getName());
+    YLOGI("add %s plugin success", plugin->getName());
+    
+    return true;
 }
 
 YAD_SINGLETON_STATIC_INSTANCE(PluginManager)

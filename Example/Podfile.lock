@@ -21,7 +21,7 @@ CHECKOUT OPTIONS:
     :commit: 3d0feb60597a968774e83933a938189e50ba71c0
     :git: https://github.com/YADetector/TTMLKit.git
   YADetectorFF:
-    :commit: 80759f2401a0015ca62fb9841b3a05e1ccf71c60
+    :commit: 094c8d51e9dab1784e94ad374b0a5c7b57fc9816
     :git: https://github.com/YADetector/YADetectorFF.git
 
 SPEC CHECKSUMS:

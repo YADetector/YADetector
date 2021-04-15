@@ -3,8 +3,8 @@
 //  YAD
 //
 
-#ifndef YAD_PLUGIN_MANAGER_h
-#define YAD_PLUGIN_MANAGER_h
+#ifndef YAD_PLUGIN_MANAGER_H
+#define YAD_PLUGIN_MANAGER_H
 
 #include "YADetector.h"
 #include "Singleton.h"
@@ -25,11 +25,12 @@ public:
 private:
     void registerBuildInPlugins();
     void registerExtendedPlugins();
-    void getAllLibPaths(std::list<std::string> &libPaths); // 获取所有动态库的文件全名
-    std::string getLibDir(); // 获取动态库目录名
-    bool isYADPlugin(std::string &libName, std::string &libNameWithoutSuffix);
+    void registerPlugins(std::string libDirectory);
+    void getPluginDirectories(std::list<std::string> &libDirectories);
+    std::string getAppLibDirectory(); // 获取应用程序的库目录
+    std::string getRelativePluginPath(std::string &fileName); // 获取插件相对路径
     void addPlugin(const std::string &libName);
-    void addPlugin(Plugin *plugin);
+    bool addPlugin(Plugin *plugin);
     
     std::mutex mMutex;
     std::list<Plugin *> mPlugins;
@@ -40,4 +41,4 @@ private:
 
 }  // namespace YAD
 
-#endif /* YAD_PLUGIN_MANAGER_h */
+#endif /* YAD_PLUGIN_MANAGER_H */
