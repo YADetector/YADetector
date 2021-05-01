@@ -17,20 +17,20 @@ static const char *kLogLevels[] = { "V", "D", "I", "W", "E", "F", NULL };
 namespace YAD {
 
 Logger::Logger() :
-    mLogHander(NULL),
-    mLogLevel(LOG_LEVEL_VERBOSE)
+    log_hander_(NULL),
+    log_level_(LOG_LEVEL_VERBOSE)
 {
     
 }
 
 void Logger::setHandler(LogFunc cb)
 {
-    mLogHander = cb;
+    log_hander_ = cb;
 }
 
 void Logger::setLevel(LogLevel level)
 {
-    mLogLevel = level;
+    log_level_ = level;
 }
 
 void Logger::log(LogLevel level, const char *tag, const char *file, int line, const char *function, const char *format, ...)
@@ -47,12 +47,12 @@ void Logger::log(LogLevel level, const char *tag, const char *file, int line, co
         return;
     }
     
-    if (level < mLogLevel) {
+    if (level < log_level_) {
         return;
     }
     
-    if (mLogHander) {
-        mLogHander(level, tag, file, line, function, format, args);
+    if (log_hander_) {
+        log_hander_(level, tag, file, line, function, format, args);
     } else {
         logDefault(level, tag, file, line, function, format, args);
     }

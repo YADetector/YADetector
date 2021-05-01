@@ -40,8 +40,8 @@ private:
     // 去除文件目录名，只保留最后部分的文件名
     const char *getLastFilePathComponent(const char *file);
     
-    LogFunc mLogHander;
-    LogLevel mLogLevel; // 默认 LOG_LEVEL_VERBOSE
+    LogFunc log_hander_;
+    LogLevel log_level_; // 默认 LOG_LEVEL_VERBOSE
     
     Logger(const Logger &);
     Logger &operator=(const Logger &);

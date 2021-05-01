@@ -43,14 +43,14 @@ PluginManager::~PluginManager()
 
 size_t PluginManager::getPluginCount()
 {
-    std::unique_lock<std::mutex> lock(mMutex);
+    std::unique_lock<std::mutex> lock(mutex_);
     
-    return mPlugins.size();
+    return plugins_.size();
 }
     
 Detector *PluginManager::createDetector(YADConfig &config)
 {
-    std::unique_lock<std::mutex> lock(mMutex);
+    std::unique_lock<std::mutex> lock(mutex_);
     
     int maxFaceCount = std::stoi(config[kYADMaxFaceCount]);
     YADPixelFormat pixFormat = (YADPixelFormat)std::stoi(config[kYADPixFormat]);
@@ -59,7 +59,7 @@ Detector *PluginManager::createDetector(YADConfig &config)
     // 查询插件是否支持对应的参数，并且选择优化最好的插件
     Plugin *plugin = nullptr;
     float confidence = 0.0f;
-    for (std::list<Plugin *>::iterator it = mPlugins.begin(); it != mPlugins.end(); ++it) {
+    for (std::list<Plugin *>::iterator it = plugins_.begin(); it != plugins_.end(); ++it) {
         float newConfidence;
         if ((*it)->sniff(config, &newConfidence)) {
             if (newConfidence > confidence) {
@@ -215,7 +215,7 @@ void PluginManager::addPlugin(const std::string &libName)
 
 bool PluginManager::addPlugin(Plugin *plugin)
 {
-    std::unique_lock<std::mutex> lock(mMutex);
+    std::unique_lock<std::mutex> lock(mutex_);
 
     if (!plugin) {
         return false;
@@ -233,7 +233,7 @@ bool PluginManager::addPlugin(Plugin *plugin)
     }
     
     // 检查重复
-    for (std::list<Plugin *>::iterator it = mPlugins.begin(); it != mPlugins.end(); ++it) {
+    for (std::list<Plugin *>::iterator it = plugins_.begin(); it != plugins_.end(); ++it) {
         if (*it == plugin) {
             YLOGW("%s plugin has been added", plugin->getName());
             return false;
@@ -243,7 +243,7 @@ bool PluginManager::addPlugin(Plugin *plugin)
     // 注册日志
     plugin->setLog(logCallback);
     
-    mPlugins.push_back(plugin);
+    plugins_.push_back(plugin);
     
     YLOGI("add %s plugin success", plugin->getName());
     

@@ -40,12 +40,12 @@ private:
     int translatePixelFormat(YADPixelFormat pixelFormat);
     int translateOrientation(YADRotateMode rotateMode);
     
-    int mInitCheck;
-    int mMaxFaceNum;
-    void *mHandle;
-    std::string mLibPath;
-    std::string mFaceModelPath;
-    std::string mFaceExtraModelPath;
+    int init_check_;
+    int max_face_num_;
+    void *handle_;
+    std::string lib_path_;
+    std::string face_model_path_;
+    std::string face_extra_model_path_;
     
     TTDetector(const TTDetector &);
     TTDetector &operator=(const TTDetector &);

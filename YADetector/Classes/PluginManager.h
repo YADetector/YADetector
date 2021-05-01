@@ -32,8 +32,8 @@ private:
     void addPlugin(const std::string &libName);
     bool addPlugin(Plugin *plugin);
     
-    std::mutex mMutex;
-    std::list<Plugin *> mPlugins;
+    std::mutex mutex_;
+    std::list<Plugin *> plugins_;
     
     PluginManager(const Detector &);
     PluginManager &operator=(const Detector &);

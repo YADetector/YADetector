@@ -103,14 +103,14 @@ typedef void (*AddExtraModelFunc)(void *handle, unsigned long long flags, char c
 typedef int (*DoPredictFunc)(void *handle, unsigned char const *baseAddress, unsigned int pixelFormatType, signed int width, signed int height, int stride, int screenOrient, unsigned long long flags, tt_faces_info_t *facesInfo);
 typedef void (*ReleaseHandleFunc)(void *handle);
 
-static bool gFirst = true;
-static void *gLibHandle = NULL;
-static std::mutex gLibMutex;
+static bool g_first = true;
+static void *g_lib_handle = NULL;
+static std::mutex g_lib_mutex;
 
-static CreateHandlerFunc gCreateHandler;
-static AddExtraModelFunc gAddExtraModel;
-static DoPredictFunc gDoPredict;
-static ReleaseHandleFunc gReleaseHandle;
+static CreateHandlerFunc g_CreateHandler;
+static AddExtraModelFunc g_AddExtraModel;
+static DoPredictFunc g_DoPredict;
+static ReleaseHandleFunc g_ReleaseHandle;
 
 TTDetector::TTDetector()
 {
@@ -125,69 +125,69 @@ TTDetector::TTDetector(YADConfig &config)
     
     initNulls();
     
-    mMaxFaceNum = std::stoi(config[kYADMaxFaceCount]);
-    mMaxFaceNum = std::min(mMaxFaceNum, YAD_MAX_FACE_NUM);
+    max_face_num_ = std::stoi(config[kYADMaxFaceCount]);
+    max_face_num_ = std::min(max_face_num_, YAD_MAX_FACE_NUM);
     // 有些情况下，调用者希望定制资源，调用者可以在config增加字段实现该功能，key: 默认资源名，value: 资源指定的路径
     // 但是需要注意的是，仍旧会优先使用App本身的资源
-    mLibPath = config[YAD_TT_LIB_NAME];
-    mFaceModelPath = config[YAD_TT_FACE_MODEL_NAME];
-    mFaceExtraModelPath = config[YAD_TT_FACE_EXTRA_MODLE_NAME];
+    lib_path_ = config[YAD_TT_LIB_NAME];
+    face_model_path_ = config[YAD_TT_FACE_MODEL_NAME];
+    face_extra_model_path_ = config[YAD_TT_FACE_EXTRA_MODLE_NAME];
 
     if (!loadSymbols()) {
         YLOGE("symbols not loaded");
-        mInitCheck = YAD_SYMBOLS_NOT_LOADED;
+        init_check_ = YAD_SYMBOLS_NOT_LOADED;
         return;
     }
     
     std::string modelPath = getModelPath();
     if (!fileExists(modelPath)) {
         YLOGE("model file not found, path: %s", modelPath.c_str());
-        mInitCheck = YAD_MODEL_NOT_FOUND;
+        init_check_ = YAD_MODEL_NOT_FOUND;
         return;
     }
     std::string extraModelPath = getExtraModelPath();
     if (!fileExists(extraModelPath)) {
         YLOGE("extra model file not found, path: %s", extraModelPath.c_str());
-        mInitCheck = YAD_MODEL_NOT_FOUND;
+        init_check_ = YAD_MODEL_NOT_FOUND;
         return;
     }
     
     unsigned long long flags = 0x20007f;
-    int ret = gCreateHandler(flags, modelPath.c_str(), &mHandle);
+    int ret = g_CreateHandler(flags, modelPath.c_str(), &handle_);
     if (ret) {
         YLOGE("create handler failed, err: %d", ret);
         return;
     }
     
     flags = 0x900;
-    gAddExtraModel(mHandle, flags, extraModelPath.c_str());
+    g_AddExtraModel(handle_, flags, extraModelPath.c_str());
     
-    mInitCheck = YAD_OK;
+    init_check_ = YAD_OK;
 }
 
 TTDetector::~TTDetector()
 {
     YLOGV("YADetectorTT dtor");
     
-    if (mHandle) {
-        gReleaseHandle(mHandle);
-        mHandle = NULL;
+    if (handle_) {
+        g_ReleaseHandle(handle_);
+        handle_ = NULL;
     }
 }
 
 void TTDetector::initNulls()
 {
-    mInitCheck = YAD_NO_INIT;
-    mMaxFaceNum = YAD_MAX_FACE_NUM;
-    mHandle = NULL;
-    mLibPath = "";
-    mFaceModelPath = "";
-    mFaceExtraModelPath = "";
+    init_check_ = YAD_NO_INIT;
+    max_face_num_ = YAD_MAX_FACE_NUM;
+    handle_ = NULL;
+    lib_path_ = "";
+    face_model_path_ = "";
+    face_extra_model_path_ = "";
 }
 
 int TTDetector::initCheck() const
 {
-    return mInitCheck;
+    return init_check_;
 }
 
 bool TTDetector::fileExists(std::string path)
@@ -199,46 +199,46 @@ bool TTDetector::fileExists(std::string path)
 
 bool TTDetector::loadSymbols()
 {
-    std::unique_lock<std::mutex> lock(gLibMutex);
+    std::unique_lock<std::mutex> lock(g_lib_mutex);
 
     // 缓存句柄，增加加载速度
-    if (!gFirst) {
-        return (gLibHandle != NULL);
+    if (!g_first) {
+        return (g_lib_handle != NULL);
     }
 
-    gFirst = false;
+    g_first = false;
 
     std::string libPath = getLibPath();
     if (!fileExists(libPath)) {
         YLOGE("lib not found, path: %s", libPath.c_str());
         return false;
     }
-    gLibHandle = dlopen(libPath.c_str(), RTLD_NOW);
-    if (gLibHandle == NULL) {
+    g_lib_handle = dlopen(libPath.c_str(), RTLD_NOW);
+    if (g_lib_handle == NULL) {
         YLOGE("dlopen failed\n");
         return false;
     }
 
-    gCreateHandler = (CreateHandlerFunc)dlsym(gLibHandle, "FS_CreateHandler");
-    if (gCreateHandler == NULL) {
+    g_CreateHandler = (CreateHandlerFunc)dlsym(g_lib_handle, "FS_CreateHandler");
+    if (g_CreateHandler == NULL) {
         YLOGE("dlsym 1 failed\n");
         goto fail;
     }
     
-    gAddExtraModel = (AddExtraModelFunc)dlsym(gLibHandle, "FS_AddExtraModel");
-    if (gAddExtraModel == NULL) {
+    g_AddExtraModel = (AddExtraModelFunc)dlsym(g_lib_handle, "FS_AddExtraModel");
+    if (g_AddExtraModel == NULL) {
         YLOGE("dlsym 2 failed\n");
         goto fail;
     }
 
-    gDoPredict = (DoPredictFunc)dlsym(gLibHandle, "FS_DoPredict");
-    if (gDoPredict == NULL) {
+    g_DoPredict = (DoPredictFunc)dlsym(g_lib_handle, "FS_DoPredict");
+    if (g_DoPredict == NULL) {
         YLOGE("dlsym 3 failed\n");
         goto fail;
     }
 
-    gReleaseHandle = (ReleaseHandleFunc)dlsym(gLibHandle, "FS_ReleaseHandle");
-    if (gReleaseHandle == NULL) {
+    g_ReleaseHandle = (ReleaseHandleFunc)dlsym(g_lib_handle, "FS_ReleaseHandle");
+    if (g_ReleaseHandle == NULL) {
         YLOGE("dlsym 4 failed\n");
         goto fail;
     }
@@ -246,8 +246,8 @@ bool TTDetector::loadSymbols()
     return true;
     
 fail:
-    dlclose(gLibHandle);
-    gLibHandle = NULL;
+    dlclose(g_lib_handle);
+    g_lib_handle = NULL;
     return false;
 }
 
@@ -320,7 +320,7 @@ std::string TTDetector::getLibPath()
     if (fileExists(path)) {
         return path;
     }
-    return mLibPath;
+    return lib_path_;
 }
 
 std::string TTDetector::getModelPath()
@@ -329,7 +329,7 @@ std::string TTDetector::getModelPath()
     if (fileExists(path)) {
         return path;
     }
-    return mFaceModelPath;
+    return face_model_path_;
 }
 
 std::string TTDetector::getExtraModelPath()
@@ -338,7 +338,7 @@ std::string TTDetector::getExtraModelPath()
     if (fileExists(path)) {
         return path;
     }
-    return mFaceExtraModelPath;
+    return face_extra_model_path_;
 }
 
 int TTDetector::detect(YADDetectImage *detectImage, YADDetectInfo *detectInfo, YADFeatureInfo *featureInfo)
@@ -366,7 +366,7 @@ int TTDetector::detect(YADDetectImage *detectImage, YADDetectInfo *detectInfo, Y
         return YAD_ROTATE_UNSUPPORTED;
     }
     
-    if (!mHandle) {
+    if (!handle_) {
         YLOGE("handle is null");
         return YAD_INVALID_OPERATION;
     }
@@ -378,7 +378,7 @@ int TTDetector::detect(YADDetectImage *detectImage, YADDetectInfo *detectInfo, Y
     // FIXME support flags
     tt_faces_info_t facesInfo;
     memset(&facesInfo, 0, sizeof(tt_faces_info_t));
-    int ret = gDoPredict(mHandle, baseAddress, pixelFormat, detectImage->width, detectImage->height, detectImage->stride, orientation, flags, &facesInfo);
+    int ret = g_DoPredict(handle_, baseAddress, pixelFormat, detectImage->width, detectImage->height, detectImage->stride, orientation, flags, &facesInfo);
     if (ret) {
         YLOGE("DoPredict failed, ret: %d", ret);
         CVPixelBufferUnlockBaseAddress(pixelBuffer, 0);
@@ -390,7 +390,7 @@ int TTDetector::detect(YADDetectImage *detectImage, YADDetectInfo *detectInfo, Y
     //YLOGD("DoPredict succ, num_faces: %d", facesInfo.num_faces);
     
     // 转换结构
-    featureInfo->num_faces = std::min(facesInfo.num_faces, mMaxFaceNum);
+    featureInfo->num_faces = std::min(facesInfo.num_faces, max_face_num_);
     for (int i = 0; i < facesInfo.num_faces; i++) {
         YADFaceInfo *dst = &(featureInfo->faces[i]);
         tt_face_base_t *src = &(facesInfo.faces[i]);
