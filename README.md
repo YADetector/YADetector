@@ -18,3 +18,7 @@ YADetectorTT 和 YADetectorFF 两个插件，YADetectorTT 性能更好些，YADe
 ## 使用
 
 使用方法详见 Demo, 主要关注项目目录中 YADetector.h 即可。
+
+## TODO
+
+增加框架[ncnn](https://github.com/Tencent/ncnn)支持。该框架开源，性能优越，社区积极。
