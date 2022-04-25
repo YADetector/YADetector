@@ -7,26 +7,34 @@
 #define YAD_PLUGIN_MANAGER_H
 
 #include "YADetector.h"
-#include "Singleton.h"
+
 #include <mutex>
 #include <list>
 #include <string>
 
 namespace YAD {
 
-class PluginManager : public Singleton<PluginManager> {
+class PluginManager {
 public:
-    PluginManager();
-    ~PluginManager();
+    static PluginManager &getInstance();
     
     size_t getPluginCount();
     Detector *createDetector(YADConfig &config);
     
 private:
+    PluginManager();
+    ~PluginManager();
+    PluginManager(const PluginManager &) = delete;
+    PluginManager(PluginManager&&) = delete;
+    PluginManager &operator=(const PluginManager &) = delete;
+    PluginManager &operator=(PluginManager&&) = delete;
+    
     void registerBuildInPlugins();
     void registerExtendedPlugins();
     void registerPlugins(std::string libDirectory);
     void getPluginDirectories(std::list<std::string> &libDirectories);
+    std::string mainBundlePath();
+    std::string initMainBundlePath();
     std::string getAppLibDirectory(); // 获取应用程序的库目录
     std::string getRelativePluginPath(std::string &fileName); // 获取插件相对路径
     void addPlugin(const std::string &libName);
@@ -34,11 +42,8 @@ private:
     
     std::mutex mutex_;
     std::list<Plugin *> plugins_;
-    
-    PluginManager(const Detector &);
-    PluginManager &operator=(const Detector &);
 };
 
-}  // namespace YAD
+}; // namespace YAD
 
 #endif /* YAD_PLUGIN_MANAGER_H */

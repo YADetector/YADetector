@@ -1,11 +1,11 @@
 #ifdef __APPLE__
 
 //
-//  Log_IOS.mm
+//  Logger_iOS.mm
 //  YAD
 //
 
-#include "Log_IOS.h"
+#include "Logger_iOS.h"
 #import <Foundation/Foundation.h>
 
 namespace YAD {
@@ -15,6 +15,6 @@ void logImpl(const char *message)
     NSLog(@"%s", message);
 }
 
-}  // namespace YAD
+}; // namespace YAD
 
 #endif

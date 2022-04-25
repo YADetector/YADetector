@@ -5,21 +5,24 @@
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "YADPM"
-#import "LogMacros.h"
+#include "LogMacros.h"
 
 #include "PluginManager.h"
 #include <CoreFoundation/CoreFoundation.h>
-#include <dlfcn.h>
-#include <string.h>
-#include <stdio.h>
-#include <dirent.h>
-#include <sstream>
-#include <regex>
-#include <stdexcept>
 #include "Logger.h"
 #ifdef WITH_YAD_TT
 #include "YADetectorTT.h"
 #endif
+
+#include <dlfcn.h>
+#include <string.h>
+#include <stdio.h>
+#include <dirent.h>
+#include <mutex>
+#include <memory>
+#include <sstream>
+#include <regex>
+#include <stdexcept>
 
 #define YAD_PLUGIN_DIRS_KEY     "YAD_PLUGIN_DIRS"
 
@@ -30,27 +33,35 @@ static void logCallback(int level, const char *tag, const char *file, int line, 
 
 namespace YAD {
 
+PluginManager &PluginManager::getInstance()
+{
+    static PluginManager instance;
+    return instance;
+}
+
 PluginManager::PluginManager()
 {
+    YLOGV("ctor");
+    
     registerBuildInPlugins();
     registerExtendedPlugins();
 }
 
 PluginManager::~PluginManager()
 {
-    
+    YLOGV("dtor");
 }
 
 size_t PluginManager::getPluginCount()
 {
-    std::unique_lock<std::mutex> lock(mutex_);
+    std::lock_guard<std::mutex> lock(mutex_);
     
     return plugins_.size();
 }
     
 Detector *PluginManager::createDetector(YADConfig &config)
 {
-    std::unique_lock<std::mutex> lock(mutex_);
+    std::lock_guard<std::mutex> lock(mutex_);
     
     int maxFaceCount = std::stoi(config[kYADMaxFaceCount]);
     YADPixelFormat pixFormat = (YADPixelFormat)std::stoi(config[kYADPixFormat]);
@@ -70,11 +81,13 @@ Detector *PluginManager::createDetector(YADConfig &config)
     }
     // 无法找到符合要求的插件，返回空
     if (!plugin) {
-        YLOGW("plugin not found, maxFaceCount: %d pixFormat:%d dataType: %d", maxFaceCount, pixFormat, dataType);
+        YLOGW("plugin not found, maxFaceCount: %d pixFormat:%d dataType: %d",
+              maxFaceCount, pixFormat, dataType);
         return nullptr;
     }
     
-    YLOGI("select %s plugin, maxFaceCount: %d pixFormat: %d dataType: %d confidence: %f", plugin->getName(), maxFaceCount, pixFormat, dataType, confidence);
+    YLOGI("select %s plugin, maxFaceCount: %d pixFormat: %d dataType: %d confidence: %f",
+          plugin->getName(), maxFaceCount, pixFormat, dataType, confidence);
     
     // 否则调用插件创建detector
     return plugin->createDetector(config);
@@ -138,41 +151,60 @@ void PluginManager::registerPlugins(std::string libDirectory)
     }
 }
 
+std::string PluginManager::mainBundlePath()
+{
+    static std::once_flag flag;
+    static std::string path;
+    std::call_once(flag, [&] {
+        path = initMainBundlePath();
+    });
+    return path;
+}
+
+std::string PluginManager::initMainBundlePath()
+{
+    CFBundleRef bundleRef; // 该引用无需释放
+    CFURLRef urlRef = NULL;
+    CFStringRef stringRef = NULL;
+    std::string errmsg;
+    char path[PATH_MAX];
+    
+    memset(path, 0x0, PATH_MAX);
+    
+    if (!(bundleRef = CFBundleGetMainBundle())) {
+        errmsg = "CFBundleGetMainBundle";
+        goto bail;
+    }
+    if (!(urlRef = CFBundleCopyBundleURL(bundleRef))) {
+        errmsg = "CFBundleCopyBundleURL";
+        goto bail;
+    }
+    if (!(stringRef = CFURLCopyFileSystemPath(urlRef, kCFURLPOSIXPathStyle))) {
+        errmsg = "CFURLCopyFileSystemPath";
+        goto bail;
+    }
+    if (!CFStringGetCString(stringRef, path, PATH_MAX, kCFStringEncodingUTF8)) {
+        errmsg = "CFStringGetCString";
+        goto bail;
+    }
+
+bail:
+    if (stringRef) {
+        CFRelease(stringRef);
+    }
+    if (urlRef) {
+        CFRelease(urlRef);
+    }
+    if (!errmsg.empty()) {
+        throw std::runtime_error(errmsg);
+    } else {
+        return std::string(path);
+    }
+}
+
 std::string PluginManager::getAppLibDirectory()
 {
-    CFBundleRef mainBundle;
-    CFURLRef bundleUrl;
-    CFStringRef sr;
-    char path[FILENAME_MAX];
-
-    if (!(mainBundle = CFBundleGetMainBundle())) {
-        std::stringstream msg;
-        msg << "CFBundleGetMainBundle() err";
-        throw std::runtime_error(msg.str());
-    }
-    
-    if (!(bundleUrl = CFBundleCopyBundleURL(mainBundle))) {
-        std::stringstream msg;
-        msg << "CFBundleCopyBundleURL() err";
-        throw std::runtime_error(msg.str());
-    }
-    if (!(sr = CFURLCopyFileSystemPath(bundleUrl, kCFURLPOSIXPathStyle))) {
-        CFRelease(bundleUrl);
-        std::stringstream msg;
-        msg << "CFURLCopyFileSystemPath() err";
-        throw std::runtime_error(msg.str());
-    }
-    if (!CFStringGetCString(sr, path, FILENAME_MAX, kCFStringEncodingASCII)) {
-        CFRelease(bundleUrl);
-        CFRelease(sr);
-        std::stringstream msg;
-        msg << "CFStringGetCString() err";
-        throw std::runtime_error(msg.str());
-    }
-    CFRelease(bundleUrl);
-    CFRelease(sr);
-
-    return std::string(path) + "/Frameworks";
+    return mainBundlePath() + "/Frameworks";
 }
 
 // 动态库插件分两种类型: YADetectorXYZ.framework 或者 libYADetectorXYZ.dylib
@@ -215,7 +247,7 @@ void PluginManager::addPlugin(const std::string &libName)
 
 bool PluginManager::addPlugin(Plugin *plugin)
 {
-    std::unique_lock<std::mutex> lock(mutex_);
+    std::lock_guard<std::mutex> lock(mutex_);
 
     if (!plugin) {
         return false;
@@ -250,6 +282,4 @@ bool PluginManager::addPlugin(Plugin *plugin)
     return true;
 }
 
-YAD_SINGLETON_STATIC_INSTANCE(PluginManager)
-
-} // namespace YAD
+}; // namespace YAD

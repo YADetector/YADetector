@@ -16,17 +16,19 @@ namespace YAD {
 class TTDetector : public Detector
 {
 public:
-    TTDetector();
+    TTDetector() = delete;
     TTDetector(YADConfig &config);
     virtual ~TTDetector();
-    virtual int initCheck() const;
-    virtual int detect(YADDetectImage *detectImage, YADDetectInfo *detectInfo, YADFeatureInfo *featureInfo);
+    
+    int initCheck() const override;
+    int detect(YADDetectImage *detectImage, YADDetectInfo *detectInfo, YADFeatureInfo *featureInfo) override;
     
 private:
-    void initNulls();
     bool fileExists(std::string path);
     bool loadSymbols();
     
+    std::string mainBundlePath();
+    std::string initMainBundlePath();
     std::string getAppLibDirectory();
     std::string getDefalutLibDirectory();
     std::string getDefalutModelDirectory();
@@ -41,17 +43,17 @@ private:
     int translateOrientation(YADRotateMode rotateMode);
     
     int init_check_;
-    int max_face_num_;
     void *handle_;
     std::string lib_path_;
     std::string face_model_path_;
     std::string face_extra_model_path_;
-    
+    int max_face_num_;
+
     TTDetector(const TTDetector &);
     TTDetector &operator=(const TTDetector &);
 };
 
-}  // namespace YAD
+}; // namespace YAD
 
 extern "C" YAD::Plugin *createYADetectorTTPlugin();
 

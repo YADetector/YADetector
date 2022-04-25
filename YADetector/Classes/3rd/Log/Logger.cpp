@@ -4,11 +4,14 @@
 //
 
 #include "Logger.h"
-#include <string>
-#include <stdio.h>
 #ifdef __APPLE__
-#include "Log_IOS.h"
+#include "Logger_iOS.h"
 #endif
+
+#include <stdio.h>
+#include <mutex>
+#include <memory>
+#include <string>
 
 #define MSG_BUF_SIZE 1024
 
@@ -16,9 +19,22 @@ static const char *kLogLevels[] = { "V", "D", "I", "W", "E", "F", NULL };
 
 namespace YAD {
 
+// 根据单例释放顺序对称原则(构造: A->B，析构: B->A)，建议创建Logger单例要比创建其它单例要更早，
+// 否则别的单例析构函数一旦调用Logger函数，会导致崩溃.
+Logger &Logger::getInstance()
+{
+    static Logger instance;
+    return instance;
+}
+
 Logger::Logger() :
     log_hander_(NULL),
     log_level_(LOG_LEVEL_VERBOSE)
+{
+    
+}
+
+Logger::~Logger()
 {
     
 }
@@ -101,6 +117,4 @@ const char *Logger::getLastFilePathComponent(const char *file)
     return ptr;
 }
 
-YAD_SINGLETON_STATIC_INSTANCE(Logger)
-
-} // namespace YAD
+}; // namespace YAD

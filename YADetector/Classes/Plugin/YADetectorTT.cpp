@@ -7,7 +7,7 @@
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "YADTT"
-#import "LogMacros.h"
+#include "LogMacros.h"
 
 #include "YADetectorTT.h"
 #include <CoreFoundation/CoreFoundation.h>
@@ -98,32 +98,27 @@ typedef struct tt_faces_info_t
 
 namespace YAD {
 
-typedef int (*CreateHandlerFunc)(unsigned long long flags, char const *param_path, void **p_handle);
-typedef void (*AddExtraModelFunc)(void *handle, unsigned long long flags, char const *param_path);
-typedef int (*DoPredictFunc)(void *handle, unsigned char const *baseAddress, unsigned int pixelFormatType, signed int width, signed int height, int stride, int screenOrient, unsigned long long flags, tt_faces_info_t *facesInfo);
-typedef void (*ReleaseHandleFunc)(void *handle);
+typedef int (*CreateHandlerFnPtr)(unsigned long long flags, char const *param_path, void **p_handle);
+typedef void (*AddExtraModelFnPtr)(void *handle, unsigned long long flags, char const *param_path);
+typedef int (*DoPredictFnPtr)(void *handle, unsigned char const *baseAddress, unsigned int pixelFormatType,signed int width, signed int height, int stride, int screenOrient, unsigned long long flags, tt_faces_info_t *facesInfo);
+typedef void (*ReleaseHandleFnPtr)(void *handle);
 
-static bool g_first = true;
-static void *g_lib_handle = NULL;
-static std::mutex g_lib_mutex;
+typedef struct {
+    CreateHandlerFnPtr CreateHandler;
+    AddExtraModelFnPtr AddExtraModel;
+    DoPredictFnPtr DoPredict;
+    ReleaseHandleFnPtr ReleaseHandle;
+} TTSymbolTable;
 
-static CreateHandlerFunc g_CreateHandler;
-static AddExtraModelFunc g_AddExtraModel;
-static DoPredictFunc g_DoPredict;
-static ReleaseHandleFunc g_ReleaseHandle;
+static void *s_lib_handle = nullptr;
+static TTSymbolTable s_symbol_table;
 
-TTDetector::TTDetector()
+TTDetector::TTDetector(YADConfig &config) :
+    init_check_(YAD_NO_INIT),
+    handle_(nullptr),
+    max_face_num_(YAD_MAX_FACE_NUM)
 {
     YLOGV("YADetectorTT ctor");
-    
-    initNulls();
-}
-
-TTDetector::TTDetector(YADConfig &config)
-{
-    YLOGV("YADetectorTT ctor");
-    
-    initNulls();
     
     max_face_num_ = std::stoi(config[kYADMaxFaceCount]);
     max_face_num_ = std::min(max_face_num_, YAD_MAX_FACE_NUM);
@@ -133,7 +128,11 @@ TTDetector::TTDetector(YADConfig &config)
     face_model_path_ = config[YAD_TT_FACE_MODEL_NAME];
     face_extra_model_path_ = config[YAD_TT_FACE_EXTRA_MODLE_NAME];
 
-    if (!loadSymbols()) {
+    static std::once_flag flag;
+    std::call_once(flag, [&] {
+        loadSymbols();
+    });
+    if (s_lib_handle == nullptr) {
         YLOGE("symbols not loaded");
         init_check_ = YAD_SYMBOLS_NOT_LOADED;
         return;
@@ -153,14 +152,15 @@ TTDetector::TTDetector(YADConfig &config)
     }
     
     unsigned long long flags = 0x20007f;
-    int ret = g_CreateHandler(flags, modelPath.c_str(), &handle_);
+    int ret = s_symbol_table.CreateHandler(flags, modelPath.c_str(), &handle_);
     if (ret) {
         YLOGE("create handler failed, err: %d", ret);
+        init_check_ = YAD_HANDLE_INVALID;
         return;
     }
     
     flags = 0x900;
-    g_AddExtraModel(handle_, flags, extraModelPath.c_str());
+    s_symbol_table.AddExtraModel(handle_, flags, extraModelPath.c_str());
     
     init_check_ = YAD_OK;
 }
@@ -170,19 +170,9 @@ TTDetector::~TTDetector()
     YLOGV("YADetectorTT dtor");
     
     if (handle_) {
-        g_ReleaseHandle(handle_);
-        handle_ = NULL;
+        s_symbol_table.ReleaseHandle(handle_);
+        handle_ = nullptr;
     }
-}
-
-void TTDetector::initNulls()
-{
-    init_check_ = YAD_NO_INIT;
-    max_face_num_ = YAD_MAX_FACE_NUM;
-    handle_ = NULL;
-    lib_path_ = "";
-    face_model_path_ = "";
-    face_extra_model_path_ = "";
 }
 
 int TTDetector::initCheck() const
@@ -199,93 +189,103 @@ bool TTDetector::fileExists(std::string path)
 
 bool TTDetector::loadSymbols()
 {
-    std::unique_lock<std::mutex> lock(g_lib_mutex);
-
-    // 缓存句柄，增加加载速度
-    if (!g_first) {
-        return (g_lib_handle != NULL);
-    }
-
-    g_first = false;
-
     std::string libPath = getLibPath();
     if (!fileExists(libPath)) {
         YLOGE("lib not found, path: %s", libPath.c_str());
         return false;
     }
-    g_lib_handle = dlopen(libPath.c_str(), RTLD_NOW);
-    if (g_lib_handle == NULL) {
-        YLOGE("dlopen failed\n");
+    s_lib_handle = dlopen(libPath.c_str(), RTLD_NOW);
+    if (s_lib_handle == nullptr) {
+        YLOGE("dlopen failed");
         return false;
     }
 
-    g_CreateHandler = (CreateHandlerFunc)dlsym(g_lib_handle, "FS_CreateHandler");
-    if (g_CreateHandler == NULL) {
-        YLOGE("dlsym 1 failed\n");
+    s_symbol_table.CreateHandler = (CreateHandlerFnPtr)dlsym(s_lib_handle, "FS_CreateHandler");
+    if (s_symbol_table.CreateHandler == nullptr) {
+        YLOGE("dlsym 1 failed");
         goto fail;
     }
     
-    g_AddExtraModel = (AddExtraModelFunc)dlsym(g_lib_handle, "FS_AddExtraModel");
-    if (g_AddExtraModel == NULL) {
-        YLOGE("dlsym 2 failed\n");
+    s_symbol_table.AddExtraModel = (AddExtraModelFnPtr)dlsym(s_lib_handle, "FS_AddExtraModel");
+    if (s_symbol_table.AddExtraModel == nullptr) {
+        YLOGE("dlsym 2 failed");
         goto fail;
     }
 
-    g_DoPredict = (DoPredictFunc)dlsym(g_lib_handle, "FS_DoPredict");
-    if (g_DoPredict == NULL) {
-        YLOGE("dlsym 3 failed\n");
+    s_symbol_table.DoPredict = (DoPredictFnPtr)dlsym(s_lib_handle, "FS_DoPredict");
+    if (s_symbol_table.DoPredict == nullptr) {
+        YLOGE("dlsym 3 failed");
         goto fail;
     }
 
-    g_ReleaseHandle = (ReleaseHandleFunc)dlsym(g_lib_handle, "FS_ReleaseHandle");
-    if (g_ReleaseHandle == NULL) {
-        YLOGE("dlsym 4 failed\n");
+    s_symbol_table.ReleaseHandle = (ReleaseHandleFnPtr)dlsym(s_lib_handle, "FS_ReleaseHandle");
+    if (s_symbol_table.ReleaseHandle == nullptr) {
+        YLOGE("dlsym 4 failed");
         goto fail;
     }
     
     return true;
     
 fail:
-    dlclose(g_lib_handle);
-    g_lib_handle = NULL;
+    dlclose(s_lib_handle);
+    s_lib_handle = nullptr;
     return false;
+}
+
+std::string TTDetector::mainBundlePath()
+{
+    static std::once_flag flag;
+    static std::string path;
+    std::call_once(flag, [&] {
+        path = initMainBundlePath();
+    });
+    return path;
+}
+
+std::string TTDetector::initMainBundlePath()
+{
+    CFBundleRef bundleRef; // 该引用无需释放
+    CFURLRef urlRef = NULL;
+    CFStringRef stringRef = NULL;
+    std::string errmsg;
+    char path[PATH_MAX];
+    
+    memset(path, 0x0, PATH_MAX);
+    
+    if (!(bundleRef = CFBundleGetMainBundle())) {
+        errmsg = "CFBundleGetMainBundle";
+        goto bail;
+    }
+    if (!(urlRef = CFBundleCopyBundleURL(bundleRef))) {
+        errmsg = "CFBundleCopyBundleURL";
+        goto bail;
+    }
+    if (!(stringRef = CFURLCopyFileSystemPath(urlRef, kCFURLPOSIXPathStyle))) {
+        errmsg = "CFURLCopyFileSystemPath";
+        goto bail;
+    }
+    if (!CFStringGetCString(stringRef, path, PATH_MAX, kCFStringEncodingUTF8)) {
+        errmsg = "CFStringGetCString";
+        goto bail;
+    }
+
+bail:
+    if (stringRef) {
+        CFRelease(stringRef);
+    }
+    if (urlRef) {
+        CFRelease(urlRef);
+    }
+    if (!errmsg.empty()) {
+        throw std::runtime_error(errmsg);
+    } else {
+        return std::string(path);
+    }
 }
 
 std::string TTDetector::getAppLibDirectory()
 {
-    CFBundleRef mainBundle;
-    CFURLRef bundleUrl;
-    CFStringRef sr;
-    char path[FILENAME_MAX];
-
-    if (!(mainBundle = CFBundleGetMainBundle())) {
-        std::stringstream msg;
-        msg << "CFBundleGetMainBundle() err";
-        throw std::runtime_error(msg.str());
-    }
-    
-    if (!(bundleUrl = CFBundleCopyBundleURL(mainBundle))) {
-        std::stringstream msg;
-        msg << "CFBundleCopyBundleURL() err";
-        throw std::runtime_error(msg.str());
-    }
-    if (!(sr = CFURLCopyFileSystemPath(bundleUrl, kCFURLPOSIXPathStyle))) {
-        CFRelease(bundleUrl);
-        std::stringstream msg;
-        msg << "CFURLCopyFileSystemPath() err";
-        throw std::runtime_error(msg.str());
-    }
-    if (!CFStringGetCString(sr, path, FILENAME_MAX, kCFStringEncodingASCII)) {
-        CFRelease(bundleUrl);
-        CFRelease(sr);
-        std::stringstream msg;
-        msg << "CFStringGetCString() err";
-        throw std::runtime_error(msg.str());
-    }
-    CFRelease(bundleUrl);
-    CFRelease(sr);
-
-    return std::string(path) + "/Frameworks";
+    return mainBundlePath() + "/Frameworks";
 }
 
 std::string TTDetector::getDefalutLibDirectory()
@@ -378,7 +378,7 @@ int TTDetector::detect(YADDetectImage *detectImage, YADDetectInfo *detectInfo, Y
     // FIXME support flags
     tt_faces_info_t facesInfo;
     memset(&facesInfo, 0, sizeof(tt_faces_info_t));
-    int ret = g_DoPredict(handle_, baseAddress, pixelFormat, detectImage->width, detectImage->height, detectImage->stride, orientation, flags, &facesInfo);
+    int ret = s_symbol_table.DoPredict(handle_, baseAddress, pixelFormat, detectImage->width, detectImage->height, detectImage->stride, orientation, flags, (tt_faces_info_t *)&facesInfo);
     if (ret) {
         YLOGE("DoPredict failed, ret: %d", ret);
         CVPixelBufferUnlockBaseAddress(pixelBuffer, 0);
@@ -387,7 +387,7 @@ int TTDetector::detect(YADDetectImage *detectImage, YADDetectInfo *detectInfo, Y
     
     CVPixelBufferUnlockBaseAddress(pixelBuffer, 0);
     
-    //YLOGD("DoPredict succ, num_faces: %d", facesInfo.num_faces);
+    //YLOGD("DoPredict succuss, num_faces: %d", facesInfo.num_faces);
     
     // 转换结构
     featureInfo->num_faces = std::min(facesInfo.num_faces, max_face_num_);
@@ -475,7 +475,7 @@ static bool sniffDetector(YADConfig &config, float *confidence)
     return *confidence > 0.0f;
 }
 
-} // namespace YAD
+}; // namespace YAD
 
 YAD::Plugin *createYADetectorTTPlugin()
 {

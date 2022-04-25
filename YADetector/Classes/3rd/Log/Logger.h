@@ -6,8 +6,8 @@
 #ifndef YAD_LOGGER_H
 #define YAD_LOGGER_H
 
-#include "Singleton.h"
 #include <stdarg.h>
+#include <memory>
 
 namespace YAD {
 
@@ -23,11 +23,10 @@ typedef enum {
 typedef void (*LogFunc)(LogLevel level, const char *tag, const char *file, int line, const char *function, const char *format, va_list args);
 
 
-class Logger : public Singleton<Logger>
+class Logger
 {
 public:
-    Logger();
-    ~Logger() {}
+    static Logger &getInstance();
     
     void setHandler(LogFunc cb);
     void setLevel(LogLevel level);
@@ -36,17 +35,21 @@ public:
     void log(LogLevel level, const char *tag, const char *file, int line, const char *function, const char *format, va_list args);
     
 private:
+    Logger();
+    ~Logger();
+    Logger(const Logger &) = delete;
+    Logger(Logger&&) = delete;
+    Logger &operator=(const Logger &) = delete;
+    Logger &operator=(Logger&&) = delete;
+    
     void logDefault(LogLevel level, const char *tag, const char *file, int line, const char *function, const char *format, va_list args);
     // 去除文件目录名，只保留最后部分的文件名
     const char *getLastFilePathComponent(const char *file);
     
     LogFunc log_hander_;
     LogLevel log_level_; // 默认 LOG_LEVEL_VERBOSE
-    
-    Logger(const Logger &);
-    Logger &operator=(const Logger &);
 };
 
-}  // namespace YAD
+}; // namespace YAD
 
 #endif /* YAD_LOGGER_H */

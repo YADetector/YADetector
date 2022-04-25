@@ -20,4 +20,4 @@ Detector *Detector::Create(YADConfig &config)
     return PluginManager::getInstance().createDetector(config);
 }
 
-} // namespace YAD
+}; // namespace YAD
