@@ -13,8 +13,6 @@
 #include <memory>
 #include <string>
 
-#define MSG_BUF_SIZE 1024
-
 static const char *kLogLevels[] = { "V", "D", "I", "W", "E", "F", NULL };
 
 namespace yad {
@@ -94,11 +92,12 @@ void Logger::logDefault(LogLevel level, const char *tag, const char *file, int l
         message.append(" "); // 最后加个空格
     }
     
-    char s[MSG_BUF_SIZE];
-    if (format) {
-        vsnprintf(s, MSG_BUF_SIZE, format, args);
+    char *buffer;
+    int bufferSize = vasprintf(&buffer, format, args);
+    if (bufferSize < 0) {
+        return;
     }
-    message.append(s);
+    message.append(buffer);
     
 #ifdef __APPLE__
     // 便于Logger可以跨平台，需要单独封装NSLog
@@ -107,6 +106,9 @@ void Logger::logDefault(LogLevel level, const char *tag, const char *file, int l
     fprintf(stderr, "%s\n", message.c_str());
     fflush(stderr);
 #endif
+    
+    free(buffer);
+    buffer = NULL;
 }
 
 const char *Logger::getLastFilePathComponent(const char *file)
