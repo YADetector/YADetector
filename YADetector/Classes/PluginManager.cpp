@@ -28,10 +28,10 @@
 
 static void logCallback(int level, const char *tag, const char *file, int line, const char *function, const char *format, va_list args)
 {
-    YAD::Logger::getInstance().log((YAD::LogLevel)level, tag, file, line, function, format, args);
+    yad::Logger::getInstance().log((yad::LogLevel)level, tag, file, line, function, format, args);
 }
 
-namespace YAD {
+namespace yad {
 
 PluginManager &PluginManager::getInstance()
 {
@@ -282,4 +282,4 @@ bool PluginManager::addPlugin(Plugin *plugin)
     return true;
 }
 
-}; // namespace YAD
+}; // namespace yad

@@ -168,7 +168,7 @@ typedef std::unordered_map<std::string, std::string> YADConfig;
 }
 #endif
 
-namespace YAD {
+namespace yad {
 
 // 检测类
 class Detector {
@@ -222,7 +222,7 @@ struct Plugin {
     CreateDetectorFunc createDetector;
 };
 
-}; // namespace YAD
+}; // namespace yad
 
 #endif /* YAD_DETECTOR_H */
 

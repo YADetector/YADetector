@@ -30,12 +30,12 @@
 #if LOG_NDEBUG
 #define YLOGV(fmt, ...) ((void)0)
 #else
-#define YLOGV(fmt, ...) YAD::Logger::getInstance().log(YAD::LOG_LEVEL_VERBOSE,  LOG_TAG, "", 0, "", fmt, ##__VA_ARGS__);
+#define YLOGV(fmt, ...) yad::Logger::getInstance().log(yad::LOG_LEVEL_VERBOSE,  LOG_TAG, "", 0, "", fmt, ##__VA_ARGS__);
 #endif
 #endif
 
-#define YLOGD(fmt, ...) YAD::Logger::getInstance().log(YAD::LOG_LEVEL_DEBUG,   LOG_TAG, "", 0, "", fmt, ##__VA_ARGS__);
-#define YLOGI(fmt, ...) YAD::Logger::getInstance().log(YAD::LOG_LEVEL_INFO,    LOG_TAG, "", 0, "", fmt, ##__VA_ARGS__);
-#define YLOGW(fmt, ...) YAD::Logger::getInstance().log(YAD::LOG_LEVEL_WARN,    LOG_TAG, "", 0, "", fmt, ##__VA_ARGS__);
-#define YLOGE(fmt, ...) YAD::Logger::getInstance().log(YAD::LOG_LEVEL_ERROR,   LOG_TAG, "", 0, "", fmt, ##__VA_ARGS__);
-#define YLOGF(fmt, ...) YAD::Logger::getInstance().log(YAD::LOG_LEVEL_FAULT,   LOG_TAG, "", 0, "", fmt, ##__VA_ARGS__);
+#define YLOGD(fmt, ...) yad::Logger::getInstance().log(yad::LOG_LEVEL_DEBUG,   LOG_TAG, "", 0, "", fmt, ##__VA_ARGS__);
+#define YLOGI(fmt, ...) yad::Logger::getInstance().log(yad::LOG_LEVEL_INFO,    LOG_TAG, "", 0, "", fmt, ##__VA_ARGS__);
+#define YLOGW(fmt, ...) yad::Logger::getInstance().log(yad::LOG_LEVEL_WARN,    LOG_TAG, "", 0, "", fmt, ##__VA_ARGS__);
+#define YLOGE(fmt, ...) yad::Logger::getInstance().log(yad::LOG_LEVEL_ERROR,   LOG_TAG, "", 0, "", fmt, ##__VA_ARGS__);
+#define YLOGF(fmt, ...) yad::Logger::getInstance().log(yad::LOG_LEVEL_FAULT,   LOG_TAG, "", 0, "", fmt, ##__VA_ARGS__);

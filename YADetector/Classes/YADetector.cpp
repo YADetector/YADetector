@@ -6,7 +6,7 @@
 #include "YADetector.h"
 #include "PluginManager.h"
 
-namespace YAD {
+namespace yad {
 
 // static
 bool Detector::Exists()
@@ -20,4 +20,4 @@ Detector *Detector::Create(YADConfig &config)
     return PluginManager::getInstance().createDetector(config);
 }
 
-}; // namespace YAD
+}; // namespace yad

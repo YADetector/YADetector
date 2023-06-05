@@ -24,7 +24,7 @@
     config[kYADMaxFaceCount] = std::to_string(3);
     config[kYADPixFormat] = std::to_string(YAD_PIX_FMT_BGRA8888);
     config[kYADDataType] = std::to_string(YAD_DATA_TYPE_IOS_PIXEL_BUFFER);
-    YAD::Detector *detector = YAD::Detector::Create(config);
+    yad::Detector *detector = yad::Detector::Create(config);
     NSLog(@"detector: %p", detector);
     if (detector) {
         NSLog(@"detector initCheck: %d", detector->initCheck());

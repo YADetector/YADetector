@@ -96,7 +96,7 @@ typedef struct tt_faces_info_t
 }
 #endif
 
-namespace YAD {
+namespace yad {
 
 typedef int (*CreateHandlerFnPtr)(unsigned long long flags, char const *param_path, void **p_handle);
 typedef void (*AddExtraModelFnPtr)(void *handle, unsigned long long flags, char const *param_path);
@@ -475,15 +475,15 @@ static bool sniffDetector(YADConfig &config, float *confidence)
     return *confidence > 0.0f;
 }
 
-}; // namespace YAD
+}; // namespace yad
 
-YAD::Plugin *createYADetectorTTPlugin()
+yad::Plugin *createYADetectorTTPlugin()
 {
-    YAD::Plugin *plugin = new YAD::Plugin;
-    plugin->getName = YAD::getName;
-    plugin->setLog = YAD::setLog;
-    plugin->sniff = YAD::sniffDetector;
-    plugin->createDetector = YAD::createDetector;
+    yad::Plugin *plugin = new yad::Plugin;
+    plugin->getName = yad::getName;
+    plugin->setLog = yad::setLog;
+    plugin->sniff = yad::sniffDetector;
+    plugin->createDetector = yad::createDetector;
     return plugin;
 }
 

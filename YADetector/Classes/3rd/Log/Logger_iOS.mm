@@ -8,13 +8,13 @@
 #include "Logger_iOS.h"
 #import <Foundation/Foundation.h>
 
-namespace YAD {
+namespace yad {
 
 void logImpl(const char *message)
 {
     NSLog(@"%s", message);
 }
 
-}; // namespace YAD
+}; // namespace yad
 
 #endif

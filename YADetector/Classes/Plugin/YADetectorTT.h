@@ -11,7 +11,7 @@
 #include "YADetector.h"
 #include <string>
 
-namespace YAD {
+namespace yad {
 
 class TTDetector : public Detector
 {
@@ -53,9 +53,9 @@ private:
     TTDetector &operator=(const TTDetector &);
 };
 
-}; // namespace YAD
+}; // namespace yad
 
-extern "C" YAD::Plugin *createYADetectorTTPlugin();
+extern "C" yad::Plugin *createYADetectorTTPlugin();
 
 #endif /* YAD_DETECTOR_TT_H */
 

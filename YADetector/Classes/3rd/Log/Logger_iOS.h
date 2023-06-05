@@ -8,11 +8,11 @@
 #ifndef YAD_LOGGER_IOS_H
 #define YAD_LOGGER_IOS_H
 
-namespace YAD {
+namespace yad {
 
 void logImpl(const char *message);
 
-}; // namespace YAD
+}; // namespace yad
 
 #endif /* YAD_LOGGER_IOS_H */
 

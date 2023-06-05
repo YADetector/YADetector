@@ -12,7 +12,7 @@
 #include <list>
 #include <string>
 
-namespace YAD {
+namespace yad {
 
 class PluginManager {
 public:
@@ -44,6 +44,6 @@ private:
     std::list<Plugin *> plugins_;
 };
 
-}; // namespace YAD
+}; // namespace yad
 
 #endif /* YAD_PLUGIN_MANAGER_H */

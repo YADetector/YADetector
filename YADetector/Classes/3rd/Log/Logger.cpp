@@ -17,7 +17,7 @@
 
 static const char *kLogLevels[] = { "V", "D", "I", "W", "E", "F", NULL };
 
-namespace YAD {
+namespace yad {
 
 // 根据单例释放顺序对称原则(构造: A->B，析构: B->A)，建议创建Logger单例要比创建其它单例要更早，
 // 否则别的单例析构函数一旦调用Logger函数，会导致崩溃.
@@ -102,7 +102,7 @@ void Logger::logDefault(LogLevel level, const char *tag, const char *file, int l
     
 #ifdef __APPLE__
     // 便于Logger可以跨平台，需要单独封装NSLog
-    YAD::logImpl(message.c_str());
+    yad::logImpl(message.c_str());
 #else
     fprintf(stderr, "%s\n", message.c_str());
     fflush(stderr);
@@ -117,4 +117,4 @@ const char *Logger::getLastFilePathComponent(const char *file)
     return ptr;
 }
 
-}; // namespace YAD
+}; // namespace yad

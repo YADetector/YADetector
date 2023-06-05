@@ -9,7 +9,7 @@
 #include <stdarg.h>
 #include <memory>
 
-namespace YAD {
+namespace yad {
 
 typedef enum {
     LOG_LEVEL_VERBOSE,
@@ -50,6 +50,6 @@ private:
     LogLevel log_level_; // 默认 LOG_LEVEL_VERBOSE
 };
 
-}; // namespace YAD
+}; // namespace yad
 
 #endif /* YAD_LOGGER_H */
