@@ -104,14 +104,21 @@ typedef int (*DoPredictFnPtr)(void *handle, unsigned char const *baseAddress, un
 typedef void (*ReleaseHandleFnPtr)(void *handle);
 
 typedef struct {
+    void *lib_handle;
+    std::string lib_path;
+    std::string face_model_path;
+    std::string face_extra_model_path;
+} TTLibraryInfo;
+
+typedef struct {
     CreateHandlerFnPtr CreateHandler;
     AddExtraModelFnPtr AddExtraModel;
     DoPredictFnPtr DoPredict;
     ReleaseHandleFnPtr ReleaseHandle;
 } TTSymbolTable;
 
-static void *s_lib_handle = nullptr;
 static TTSymbolTable s_symbol_table;
+static TTLibraryInfo s_library_info;
 
 TTDetector::TTDetector(YADConfig &config) :
     init_check_(YAD_NO_INIT),
@@ -122,31 +129,16 @@ TTDetector::TTDetector(YADConfig &config) :
     
     max_face_num_ = std::stoi(config[kYADMaxFaceCount]);
     max_face_num_ = std::min(max_face_num_, YAD_MAX_FACE_NUM);
-    // 有些情况下，调用者希望定制资源，调用者可以在config增加字段实现该功能，key: 默认资源名，value: 资源指定的路径
-    // 但是需要注意的是，仍旧会优先使用App本身的资源
-    lib_path_ = config[YAD_TT_LIB_NAME];
-    face_model_path_ = config[YAD_TT_FACE_MODEL_NAME];
-    face_extra_model_path_ = config[YAD_TT_FACE_EXTRA_MODLE_NAME];
-
-    static std::once_flag flag;
-    std::call_once(flag, [&] {
-        loadSymbols();
-    });
-    if (s_lib_handle == nullptr) {
-        YLOGE("symbols not loaded");
-        init_check_ = YAD_SYMBOLS_NOT_LOADED;
-        return;
-    }
     
     std::string modelPath = getModelPath();
     if (!fileExists(modelPath)) {
-        YLOGE("model file not found, path: %s", modelPath.c_str());
+        YLOGE("model file not found");
         init_check_ = YAD_MODEL_NOT_FOUND;
         return;
     }
     std::string extraModelPath = getExtraModelPath();
     if (!fileExists(extraModelPath)) {
-        YLOGE("extra model file not found, path: %s", extraModelPath.c_str());
+        YLOGE("extra model file not found");
         init_check_ = YAD_MODEL_NOT_FOUND;
         return;
     }
@@ -175,60 +167,48 @@ TTDetector::~TTDetector()
     }
 }
 
-int TTDetector::initCheck() const
-{
-    return init_check_;
-}
+#pragma mark Praivate
 
-bool TTDetector::fileExists(std::string path)
+bool TTDetector::loadSymbols(std::string libPath)
 {
-    struct stat pathStat;
-    memset(&pathStat, 0, sizeof(struct stat));
-    return stat(path.c_str(), &pathStat) == 0;
-}
-
-bool TTDetector::loadSymbols()
-{
-    std::string libPath = getLibPath();
-    if (!fileExists(libPath)) {
-        YLOGE("lib not found, path: %s", libPath.c_str());
-        return false;
-    }
-    s_lib_handle = dlopen(libPath.c_str(), RTLD_NOW);
-    if (s_lib_handle == nullptr) {
+    memset(&s_symbol_table, 0, sizeof(TTSymbolTable));
+    
+    s_library_info.lib_handle = dlopen(libPath.c_str(), RTLD_NOW);
+    if (s_library_info.lib_handle == nullptr) {
         YLOGE("dlopen failed");
         return false;
     }
 
-    s_symbol_table.CreateHandler = (CreateHandlerFnPtr)dlsym(s_lib_handle, "FS_CreateHandler");
+    s_symbol_table.CreateHandler = (CreateHandlerFnPtr)dlsym(s_library_info.lib_handle, "FS_CreateHandler");
     if (s_symbol_table.CreateHandler == nullptr) {
         YLOGE("dlsym 1 failed");
-        goto fail;
+        goto bail;
     }
     
-    s_symbol_table.AddExtraModel = (AddExtraModelFnPtr)dlsym(s_lib_handle, "FS_AddExtraModel");
+    s_symbol_table.AddExtraModel = (AddExtraModelFnPtr)dlsym(s_library_info.lib_handle, "FS_AddExtraModel");
     if (s_symbol_table.AddExtraModel == nullptr) {
         YLOGE("dlsym 2 failed");
-        goto fail;
+        goto bail;
     }
 
-    s_symbol_table.DoPredict = (DoPredictFnPtr)dlsym(s_lib_handle, "FS_DoPredict");
+    s_symbol_table.DoPredict = (DoPredictFnPtr)dlsym(s_library_info.lib_handle, "FS_DoPredict");
     if (s_symbol_table.DoPredict == nullptr) {
         YLOGE("dlsym 3 failed");
-        goto fail;
+        goto bail;
     }
 
-    s_symbol_table.ReleaseHandle = (ReleaseHandleFnPtr)dlsym(s_lib_handle, "FS_ReleaseHandle");
+    s_symbol_table.ReleaseHandle = (ReleaseHandleFnPtr)dlsym(s_library_info.lib_handle, "FS_ReleaseHandle");
     if (s_symbol_table.ReleaseHandle == nullptr) {
         YLOGE("dlsym 4 failed");
-        goto fail;
+        goto bail;
     }
     
     return true;
     
-fail:
-    dlclose(s_lib_handle);
-    s_lib_handle = nullptr;
+bail:
+    memset(&s_symbol_table, 0, sizeof(TTSymbolTable));
+    dlclose(s_library_info.lib_handle);
+    s_library_info.lib_handle = nullptr;
     return false;
 }
 
@@ -320,7 +300,7 @@ std::string TTDetector::getLibPath()
     if (fileExists(path)) {
         return path;
     }
-    return lib_path_;
+    return s_library_info.lib_path;
 }
 
 std::string TTDetector::getModelPath()
@@ -329,7 +309,7 @@ std::string TTDetector::getModelPath()
     if (fileExists(path)) {
         return path;
     }
-    return face_model_path_;
+    return s_library_info.face_model_path;
 }
 
 std::string TTDetector::getExtraModelPath()
@@ -338,7 +318,90 @@ std::string TTDetector::getExtraModelPath()
     if (fileExists(path)) {
         return path;
     }
-    return face_extra_model_path_;
+    return s_library_info.face_extra_model_path;
+}
+
+bool TTDetector::fileExists(std::string path)
+{
+    struct stat pathStat;
+    memset(&pathStat, 0, sizeof(struct stat));
+    return stat(path.c_str(), &pathStat) == 0;
+}
+
+int TTDetector::translatePixelFormat(YADPixelFormat pixelFormat)
+{
+    switch (pixelFormat) {
+        case YAD_PIX_FMT_BGR888:
+            return kPixelFormat_BGR888;
+        case YAD_PIX_FMT_RGB888:
+            return kPixelFormat_RGB888;
+        case YAD_PIX_FMT_BGRA8888:
+            return kPixelFormat_BGRA8888;
+        case YAD_PIX_FMT_RGBA8888:
+            return kPixelFormat_RGBA8888;
+        default:
+            break;
+    }
+    return INT_MAX;
+}
+
+int TTDetector::translateOrientation(YADRotateMode rotateMode)
+{
+    switch (rotateMode) {
+        case YAD_ROTATE_0:
+            return kOrientation_UP;
+        case YAD_ROTATE_90:
+            return kOrientation_RIGHT;
+        case YAD_ROTATE_180:
+            return kOrientation_BOTTOM;
+        case YAD_ROTATE_270:
+            return kOrientation_LEFT;
+        default:
+            break;
+    }
+    return INT_MAX;
+}
+
+#pragma mark API
+
+int TTDetector::load(YADConfig &config)
+{
+    // 有些情况下，调用者希望定制资源，调用者可以在config增加字段实现该功能，key: 默认资源名，value: 资源指定的路径
+    // 但是需要注意的是，仍旧会优先使用App本身的资源
+    s_library_info.lib_handle = nullptr;
+    s_library_info.lib_path = config[YAD_TT_LIB_NAME];
+    s_library_info.face_model_path = config[YAD_TT_FACE_MODEL_NAME];
+    s_library_info.face_extra_model_path = config[YAD_TT_FACE_EXTRA_MODLE_NAME];
+
+    std::string libPath = getLibPath();
+    if (!fileExists(libPath)) {
+        YLOGE("lib not found");
+        return YAD_SYMBOLS_NOT_LOADED;
+    }
+    
+    loadSymbols(libPath);
+    if (s_library_info.lib_handle == nullptr) {
+        YLOGE("symbols not loaded");
+        return YAD_SYMBOLS_NOT_LOADED;
+    }
+    
+    std::string modelPath = getModelPath();
+    if (!fileExists(modelPath)) {
+        YLOGE("model file not found");
+        return YAD_MODEL_NOT_FOUND;
+    }
+    std::string extraModelPath = getExtraModelPath();
+    if (!fileExists(extraModelPath)) {
+        YLOGE("extra model file not found");
+        return YAD_MODEL_NOT_FOUND;
+    }
+    
+    return YAD_OK;
+}
+
+int TTDetector::initCheck() const
+{
+    return init_check_;
 }
 
 int TTDetector::detect(YADDetectImage *detectImage, YADDetectInfo *detectInfo, YADFeatureInfo *featureInfo)
@@ -407,39 +470,7 @@ int TTDetector::detect(YADDetectImage *detectImage, YADDetectInfo *detectInfo, Y
     return YAD_OK;
 }
 
-int TTDetector::translatePixelFormat(YADPixelFormat pixelFormat)
-{
-    switch (pixelFormat) {
-        case YAD_PIX_FMT_BGR888:
-            return kPixelFormat_BGR888;
-        case YAD_PIX_FMT_RGB888:
-            return kPixelFormat_RGB888;
-        case YAD_PIX_FMT_BGRA8888:
-            return kPixelFormat_BGRA8888;
-        case YAD_PIX_FMT_RGBA8888:
-            return kPixelFormat_RGBA8888;
-        default:
-            break;
-    }
-    return INT_MAX;
-}
-
-int TTDetector::translateOrientation(YADRotateMode rotateMode)
-{
-    switch (rotateMode) {
-        case YAD_ROTATE_0:
-            return kOrientation_UP;
-        case YAD_ROTATE_90:
-            return kOrientation_RIGHT;
-        case YAD_ROTATE_180:
-            return kOrientation_BOTTOM;
-        case YAD_ROTATE_270:
-            return kOrientation_LEFT;
-        default:
-            break;
-    }
-    return INT_MAX;
-}
+#pragma mark Export
 
 static Detector *createDetector(YADConfig &config)
 {
@@ -454,6 +485,11 @@ static const char *getName()
 static void setLog(Log log)
 {
     
+}
+
+static int load(YADConfig &config)
+{
+    return yad::TTDetector::load(config);
 }
 
 static bool sniffDetector(YADConfig &config, float *confidence)
@@ -482,6 +518,7 @@ yad::Plugin *createYADetectorTTPlugin()
     yad::Plugin *plugin = new yad::Plugin;
     plugin->getName = yad::getName;
     plugin->setLog = yad::setLog;
+    plugin->load = yad::load;
     plugin->sniff = yad::sniffDetector;
     plugin->createDetector = yad::createDetector;
     return plugin;

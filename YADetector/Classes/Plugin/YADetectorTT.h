@@ -20,33 +20,32 @@ public:
     TTDetector(YADConfig &config);
     virtual ~TTDetector();
     
+    static int load(YADConfig &config);
+    
     int initCheck() const override;
     int detect(YADDetectImage *detectImage, YADDetectInfo *detectInfo, YADFeatureInfo *featureInfo) override;
     
 private:
-    bool fileExists(std::string path);
-    bool loadSymbols();
+    static bool loadSymbols(std::string libPath);
     
-    std::string mainBundlePath();
-    std::string initMainBundlePath();
-    std::string getAppLibDirectory();
-    std::string getDefalutLibDirectory();
-    std::string getDefalutModelDirectory();
-    std::string getDefalutLibPath();
-    std::string getDefalutModelPath();
-    std::string getDefalutExtraModelPath();
-    std::string getLibPath();
-    std::string getModelPath();
-    std::string getExtraModelPath();
+    static std::string mainBundlePath();
+    static std::string initMainBundlePath();
+    static std::string getAppLibDirectory();
+    static std::string getDefalutLibDirectory();
+    static std::string getDefalutModelDirectory();
+    static std::string getDefalutLibPath();
+    static std::string getDefalutModelPath();
+    static std::string getDefalutExtraModelPath();
+    static std::string getLibPath();
+    static std::string getModelPath();
+    static std::string getExtraModelPath();
     
-    int translatePixelFormat(YADPixelFormat pixelFormat);
-    int translateOrientation(YADRotateMode rotateMode);
+    static bool fileExists(std::string path);
+    static int translatePixelFormat(YADPixelFormat pixelFormat);
+    static int translateOrientation(YADRotateMode rotateMode);
     
     int init_check_;
     void *handle_;
-    std::string lib_path_;
-    std::string face_model_path_;
-    std::string face_extra_model_path_;
     int max_face_num_;
 
     TTDetector(const TTDetector &);

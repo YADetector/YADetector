@@ -204,11 +204,14 @@ typedef void (*Log)(int level, const char *tag, const char *file, int line, cons
 
 // 获取名字
 typedef const char *(*GetNameFunc)();
+// 设置日志回调
 typedef void (*SetLogFunc)(Log log);
-// 嗅探。插件根据参数返回confidence。
+// 检查和加载资源
+typedef int (*LoadFunc)(YADConfig &config);
+// 根据配置嗅探。插件根据参数返回confidence。
 // confidence范围：0~1.0，该值越高，插件优先级就越高。主要用于在多个都能实现功能的插件中，选取优化最好的插件。
 typedef bool (*SniffFunc)(YADConfig &config, float *confidence);
-// 检测
+// 创建Detector实例
 typedef Detector *(*CreateDetectorFunc)(YADConfig &config);
 
 // 插件类，框架支持第三方插件，用户可以扩展自定义。
@@ -218,6 +221,7 @@ typedef Detector *(*CreateDetectorFunc)(YADConfig &config);
 struct Plugin {
     GetNameFunc getName;
     SetLogFunc setLog;
+    LoadFunc load;
     SniffFunc sniff;
     CreateDetectorFunc createDetector;
 };
@@ -225,4 +229,3 @@ struct Plugin {
 }; // namespace yad
 
 #endif /* YAD_DETECTOR_H */
-

@@ -70,7 +70,7 @@ Detector *PluginManager::createDetector(YADConfig &config)
     // 查询插件是否支持对应的参数，并且选择优化最好的插件
     Plugin *plugin = nullptr;
     float confidence = 0.0f;
-    for (std::list<Plugin *>::iterator it = plugins_.begin(); it != plugins_.end(); ++it) {
+    for (auto it = plugins_.begin(); it != plugins_.end(); ++it) {
         float newConfidence;
         if ((*it)->sniff(config, &newConfidence)) {
             if (newConfidence > confidence) {
@@ -213,8 +213,10 @@ std::string PluginManager::getRelativePluginPath(std::string &fileName)
     if (std::regex_match(fileName, std::regex("YADetector(.+)\\.framework"))) {
         std::size_t pos = fileName.find(".framework");
         std::string libName = fileName.substr(0, pos);
+        // 返回形式: YADetectorXYZ.framework/YADetectorXYZ
         return fileName + "/" + libName;
     } else if (std::regex_match(fileName, std::regex("libYADetector(.+)\\.dylib"))) {
+        // 返回形式: libYADetectorXYZ.dylib
         return fileName;
     }
     
@@ -258,18 +260,28 @@ bool PluginManager::addPlugin(Plugin *plugin)
         YLOGE("plugin getName() is missing");
         return false;
     }
+    std::string name = plugin->getName();
         
-    if (!(plugin->setLog && plugin->sniff && plugin->createDetector)) {
-        YLOGE("%s plugin implementation is missing", plugin->getName());
+    if (!(plugin->setLog && plugin->load && plugin->sniff && plugin->createDetector)) {
+        YLOGE("%s plugin implementation is missing", name.c_str());
         return false;
     }
     
     // 检查重复
-    for (std::list<Plugin *>::iterator it = plugins_.begin(); it != plugins_.end(); ++it) {
+    for (auto it = plugins_.begin(); it != plugins_.end(); ++it) {
         if (*it == plugin) {
-            YLOGW("%s plugin has been added", plugin->getName());
+            YLOGW("%s plugin has been added", name.c_str());
             return false;
         }
+    }
+
+    // 加载资源
+    // TODO 从json配置文件中读取配置，比如路径等
+    YADConfig config;
+    int err = plugin->load(config);
+    if (err != YAD_NO_ERROR) {
+        YLOGW("load %s plugin failure", name.c_str());
+        return false;
     }
     
     // 注册日志
@@ -277,7 +289,7 @@ bool PluginManager::addPlugin(Plugin *plugin)
     
     plugins_.push_back(plugin);
     
-    YLOGI("add %s plugin success", plugin->getName());
+    YLOGI("add %s plugin success", name.c_str());
     
     return true;
 }
